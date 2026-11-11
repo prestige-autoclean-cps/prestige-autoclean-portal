@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Staff Login — Prestige Auto Clean</title>
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:ital,wght@1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-box">
+      <img class="logo" src="assets/logo.png" alt="Prestige Auto Clean" />
+      <h1>Staff Login</h1>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" autocomplete="current-password" required />
+        </div>
+        <p class="error-text" id="login-error"></p>
+        <button type="submit" class="btn btn-primary" id="login-submit">Log in</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    const form = document.getElementById("login-form");
+    const errorText = document.getElementById("login-error");
+    const submitBtn = document.getElementById("login-submit");
+
+    // If already logged in, skip straight to the dashboard stub.
+    getStaffProfile().then((profile) => {
+      if (profile) window.location.href = "dashboard.html";
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorText.textContent = "";
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Logging in...";
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      try {
+        await loginStaff(email, password);
+        window.location.href = "dashboard.html";
+      } catch (err) {
+        errorText.textContent = "Email or password is incorrect.";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Log in";
+      }
+    });
+  </script>
+</body>
+</html>

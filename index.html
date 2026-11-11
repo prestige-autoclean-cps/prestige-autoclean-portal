@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prestige Auto Clean Portal</title>
+  <link rel="icon" href="assets/logo.png" />
+</head>
+<body>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    // Simple traffic director: send staff to their dashboard if already
+    // logged in, otherwise to the login page. The public booking page
+    // (phase 5) will likely become the real homepage later.
+    (async () => {
+      const profile = await getStaffProfile();
+      window.location.href = profile ? "dashboard.html" : "login.html";
+    })();
+  </script>
+</body>
+</html>

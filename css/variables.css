@@ -1,0 +1,31 @@
+/* Prestige Auto Clean — design tokens
+   Keep every color/font/spacing choice here so pages stay consistent. */
+:root {
+  /* Colors */
+  --color-black: #0B0D14;
+  --color-blue: #2438D4;
+  --color-blue-dark: #16259A;
+  --color-blue-light: #6C8CFF;
+  --color-bg: #EEF1F8;
+  --color-card: #FFFFFF;
+  --color-text: #12141C;
+  --color-text-secondary: #4D5466;
+  --color-border: #E4E8F1;
+  --color-border-strong: #C5CBDB;
+  --color-warning: #C2410C;
+
+  /* Status pill colors */
+  --status-scheduled: #9AA2B1;
+  --status-on-the-way: #D97706;
+  --status-in-progress: #2438D4;
+  --status-done: #16A34A;
+
+  /* Fonts */
+  --font-headline: 'Saira', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  /* Shape */
+  --radius-card: 16px;
+  --radius-control: 10px;
+  --tap-min: 44px;
+}

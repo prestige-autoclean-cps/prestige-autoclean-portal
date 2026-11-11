@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard — Prestige Auto Clean</title>
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:ital,wght@1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="stub-page">
+    <img src="assets/logo.png" alt="Prestige Auto Clean" style="max-width:180px;" />
+    <div class="card">
+      <h2>Phase 1 check: login works</h2>
+      <p id="greeting">Loading your profile...</p>
+      <p>This placeholder page proves staff login and roles are wired up.
+         The real owner dashboard and tech job screen replace this in later phases.</p>
+      <button class="btn btn-secondary" id="logout-btn">Sign out</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    (async () => {
+      const profile = await requireStaffSession();
+      if (!profile) return; // requireStaffSession already redirected to login
+
+      const greeting = document.getElementById("greeting");
+      greeting.innerHTML =
+        `Signed in as <strong>${escapeHtml(profile.name || "(no name set)")}</strong>` +
+        `<span class="role-badge">${escapeHtml(profile.role)}</span>`;
+    })();
+
+    document.getElementById("logout-btn").addEventListener("click", logoutStaff);
+
+    // Minimal HTML escaping for free-text fields (name, etc.) shown on the page.
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
