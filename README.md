@@ -4,10 +4,41 @@ A custom web portal for Prestige Auto Clean (mobile auto detailing): owner
 dashboard, tech job screen, and customer booking page. Built by Matt Obergas /
 City Park Solutions. Background and full plan: [PRESTIGE_BUILD_BRIEF.md](PRESTIGE_BUILD_BRIEF.md).
 
-This is **Phase 1: accounts connected + staff login**. There's no real
-dashboard yet — just enough wiring to prove an owner and a tech can each log
-in and the system knows which is which. Later phases build the real screens
-on top of this.
+This is **Phase 1: accounts connected + staff login** — done and live. There's
+no real dashboard yet — just enough wiring to prove an owner and a tech can
+each log in and the system knows which is which. Later phases build the real
+screens on top of this.
+
+## Current accounts (Phase 1 setup)
+
+- **GitHub:** code lives at `github.com/prestige-autoclean-cps/prestige-autoclean-portal`,
+  owned by the `prestige-autoclean-cps` organization (Matt's `mobergas`
+  account is a member with write access). The repo is currently **public** —
+  see "Why the repo is public" below.
+- **Supabase:** project `prestige-portal`, connected via `js/config.js`.
+- **Vercel:** deployed under Matt's personal `mobergas` Hobby account/team
+  (`City Park Solutions`), not a separate Prestige team — see "Why it's on
+  the personal Vercel account" below.
+
+### Why the repo is public
+
+Vercel's free Hobby plan can't deploy from a **private** GitHub organization
+repo — only its paid Pro plan can. Rather than pay before there's anything
+worth paying for, we made the repo public instead. That's safe here: the only
+credential committed anywhere in this project is the Supabase **publishable**
+key, which is meant to be public (every table is locked down with Row Level
+Security). The Supabase **secret** key has never been committed. Flip the
+repo back to private once Prestige upgrades Vercel to Pro before real launch.
+
+### Why it's on the personal Vercel account
+
+Vercel also requires a paid plan for a second Team under one login, and
+signing up a fully separate Vercel account hit a "phone number already in
+use" wall (Vercel ties account uniqueness to phone number, not just email).
+For now the project just lives as a second project in Matt's existing
+personal Vercel Hobby account, alongside his other clients' projects —
+billing/hosting isn't separated from City Park's other work yet. Move it to
+its own Team (paid) later if/when that separation matters enough to pay for.
 
 ## What's in this folder
 
@@ -24,25 +55,15 @@ js/auth.js             Login / logout / "who's logged in" helpers
 supabase/001_profiles_and_auth.sql   Database setup script for Phase 1
 ```
 
-## Matt's setup steps
-
-Do these in order. Nothing here requires coding — it's all clicking through
-websites and copy/pasting. Ask the Prestige owner **which email address**
-should own these accounts before you start (see question 7 in the build
-brief) — use that same email for all four services below, so the business
-owns its own accounts and a handoff later is clean.
+## Setup steps (already done — kept here for reference / a future handoff)
 
 ### Step 1 — GitHub (stores the code)
 
-1. Go to github.com and sign up (or log in) with the Prestige business email.
-2. Click the **+** in the top right → **New repository**.
-3. Name it `prestige-portal`. Keep it **Private**. Don't check any of the
-   "initialize with..." boxes. Click **Create repository**.
-4. GitHub will show you a page with commands under "...or push an existing
-   repository from the command line." Keep that page open — send me (Claude
-   Code) the repository's URL (it looks like
-   `https://github.com/yourname/prestige-portal.git`) and I'll push this code
-   up for you.
+Done. Code is pushed to `github.com/prestige-autoclean-cps/prestige-autoclean-portal`.
+If this ever needs redoing from scratch (e.g. a full handoff to a fresh
+account): create a new repo under whichever account/org should own it, keep
+it private if that account has a Vercel Pro plan (see "Why the repo is
+public" above for why this one isn't), and push this folder's code to it.
 
 ### Step 2 — Supabase (database + logins)
 
@@ -74,25 +95,19 @@ owns its own accounts and a handoff later is clean.
 
 ### Step 3 — Vercel (hosting)
 
-1. Go to vercel.com and sign up with the same business email — you can
-   choose "Continue with GitHub" to link it to the account from Step 1.
-2. Click **Add New** → **Project**, then **Import** the `prestige-portal`
-   repository from GitHub (once I've pushed the code there).
-3. Leave all the build settings as default (this is a plain HTML/CSS/JS site,
-   nothing to configure) and click **Deploy**.
-4. Vercel gives you a URL like `prestige-portal.vercel.app` — that's the
-   live site. Every time new code is pushed to GitHub, Vercel updates it
-   automatically within a minute or two.
+Done. Deployed from the repo above into Matt's personal Vercel account (see
+"Why it's on the personal Vercel account" above). Every push to the GitHub
+repo's `master` branch redeploys automatically within a minute or two.
 
 ### Step 4 — try it
 
-1. Open the Vercel URL once it's deployed. (You can also preview locally
-   before pushing anything — in Claude Code, open the Browser pane and
-   start the "static-preview" server from `.claude/launch.json`; don't just
+1. Open the live Vercel URL. (You can also preview locally before pushing
+   anything — in Claude Code, open the Browser pane and start the
+   "static-preview" server from `.claude/launch.json`; don't just
    double-click `login.html`, since opening a file directly skips the
    styling and scripts.)
 2. Log in with the owner email/password from Step 2.6. You should land on a
-   page that says "Signed in as [your name] OWNER".
+   page that says "Signed in as [your name] OWNER". Confirmed working.
 3. Log out, then log in with a tech account — it should say "TECH" instead.
 
 If a login fails, the most common cause is `js/config.js` still having the
