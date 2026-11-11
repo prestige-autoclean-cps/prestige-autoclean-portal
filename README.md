@@ -86,8 +86,11 @@ owns its own accounts and a handoff later is clean.
 
 ### Step 4 — try it
 
-1. Open the Vercel URL (or just double-click `login.html` on your computer
-   to try it locally first).
+1. Open the Vercel URL once it's deployed. (You can also preview locally
+   before pushing anything — in Claude Code, open the Browser pane and
+   start the "static-preview" server from `.claude/launch.json`; don't just
+   double-click `login.html`, since opening a file directly skips the
+   styling and scripts.)
 2. Log in with the owner email/password from Step 2.6. You should land on a
    page that says "Signed in as [your name] OWNER".
 3. Log out, then log in with a tech account — it should say "TECH" instead.
