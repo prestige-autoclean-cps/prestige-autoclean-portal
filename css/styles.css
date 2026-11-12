@@ -480,3 +480,127 @@ a:hover { color: var(--color-blue-dark); }
   font-size: 13px;
   width: 100%;
 }
+
+/* ---- Calendar (schedule page, phase 3+) ---- */
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.calendar-nav h2 {
+  font-size: 20px;
+}
+
+.calendar-nav-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.calendar-nav-buttons .btn {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.calendar-day {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  min-height: 96px;
+  min-width: 0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.calendar-day.other-month {
+  background: var(--color-bg);
+}
+
+.calendar-day.other-month .calendar-day-number {
+  color: var(--color-text-secondary);
+}
+
+.calendar-day.is-today {
+  border-color: var(--color-blue);
+  border-width: 2px;
+}
+
+.calendar-day.is-selected {
+  outline: 2px solid var(--color-blue);
+  outline-offset: -1px;
+}
+
+.calendar-day-number {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.calendar-chip {
+  font-size: 11px;
+  background: var(--color-bg);
+  border-radius: 6px;
+  padding: 2px 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+  width: 100%;
+}
+
+.calendar-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.calendar-more {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 640px) {
+  .calendar-day {
+    min-height: 72px;
+    padding: 4px;
+  }
+  .calendar-weekday {
+    font-size: 10px;
+  }
+  .calendar-chip {
+    font-size: 10px;
+  }
+}

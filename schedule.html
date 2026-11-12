@@ -18,18 +18,6 @@
       <h1 class="page-title">Schedule</h1>
       <button class="btn btn-primary" id="show-new-job-btn">+ New job</button>
     </div>
-    <div class="card" style="margin-bottom:16px;">
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
-        <div class="field" style="margin-bottom:0;">
-          <label for="range-from">From</label>
-          <input type="date" id="range-from" />
-        </div>
-        <div class="field" style="margin-bottom:0;">
-          <label for="range-to">To</label>
-          <input type="date" id="range-to" />
-        </div>
-      </div>
-    </div>
 
     <div class="card" id="new-job-card" style="display:none;">
       <h2 style="font-size:18px;">New job</h2>
@@ -86,11 +74,36 @@
       </form>
     </div>
 
-    <div class="card">
+    <div class="card" style="margin-bottom:16px;">
       <div class="filter-row" id="tech-filter-row">
         <button class="filter-btn active" data-tech-filter="">All</button>
       </div>
-      <div id="jobs-list"><p class="empty-text">Loading the schedule...</p></div>
+
+      <div class="calendar-nav">
+        <h2 id="calendar-month-label"></h2>
+        <div class="calendar-nav-buttons">
+          <button class="btn btn-secondary" id="calendar-prev-btn">&larr; Prev</button>
+          <button class="btn btn-secondary" id="calendar-today-btn">Today</button>
+          <button class="btn btn-secondary" id="calendar-next-btn">Next &rarr;</button>
+        </div>
+      </div>
+
+      <div class="calendar-weekdays">
+        <div class="calendar-weekday">Sun</div>
+        <div class="calendar-weekday">Mon</div>
+        <div class="calendar-weekday">Tue</div>
+        <div class="calendar-weekday">Wed</div>
+        <div class="calendar-weekday">Thu</div>
+        <div class="calendar-weekday">Fri</div>
+        <div class="calendar-weekday">Sat</div>
+      </div>
+
+      <div class="calendar-grid" id="calendar-grid"><p class="empty-text">Loading the schedule...</p></div>
+    </div>
+
+    <div class="card" id="day-panel">
+      <h2 id="day-panel-heading" style="font-size:18px;">Jobs</h2>
+      <div id="day-panel-jobs"></div>
     </div>
   </div>
 
@@ -108,13 +121,18 @@
     let vehicles = [];
     let packages = [];
     let techs = [];
-    let upcomingJobs = [];
+    let visibleJobs = [];
     let activeTechFilter = "";
     const vehiclesByCustomer = new Map();
     const customersById = new Map();
     const vehiclesById = new Map();
     const packagesById = new Map();
     const techsById = new Map();
+
+    const today = new Date();
+    const todayKey = isoToDateInput(today.toISOString());
+    let currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    let selectedDateKey = todayKey;
 
     (async () => {
       const profile = await requireStaffSession();
@@ -128,35 +146,35 @@
       document.getElementById("nav-container").innerHTML = renderNav(profile, "schedule");
       wireNavLogout();
 
-      const { startIso: defaultFrom, endIso: defaultTo } = upcomingRangeIso(30);
-      document.getElementById("range-from").value = isoToDateInput(defaultFrom);
-      document.getElementById("range-to").value = isoToDateInput(
-        new Date(new Date(defaultTo).getTime() - 86400000).toISOString()
-      );
-      document.getElementById("range-from").addEventListener("change", loadEverything);
-      document.getElementById("range-to").addEventListener("change", loadEverything);
-
       await loadEverything();
     })();
 
+    function gridRange() {
+      const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+      const gridStart = new Date(monthStart);
+      gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+      const gridEnd = new Date(monthEnd);
+      gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()) + 1); // exclusive
+      return { gridStart, gridEnd };
+    }
+
     async function loadEverything() {
+      const grid = document.getElementById("calendar-grid");
       try {
-        const { startIso, endIso } = dateRangeIso(
-          document.getElementById("range-from").value,
-          document.getElementById("range-to").value
-        );
+        const { gridStart, gridEnd } = gridRange();
         const [c, v, p, t, jobs] = await Promise.all([
           listCustomers(),
           listAllVehicles(),
           listPackages(),
           listTechs(),
-          listJobsForRange(startIso, endIso),
+          listJobsForRange(gridStart.toISOString(), gridEnd.toISOString()),
         ]);
         customers = c;
         vehicles = v;
         packages = p;
         techs = t;
-        upcomingJobs = jobs;
+        visibleJobs = jobs;
 
         customersById.clear();
         customers.forEach((x) => customersById.set(x.id, x));
@@ -174,11 +192,97 @@
 
         populateNewJobSelects();
         renderTechFilters();
-        renderJobsList();
+        renderCalendar();
+        renderDayPanel();
       } catch (err) {
-        document.getElementById("jobs-list").innerHTML =
-          `<p class="error-text">Could not load the schedule: ${escapeHtml(err.message)}</p>`;
+        grid.innerHTML = `<p class="error-text">Could not load the schedule: ${escapeHtml(err.message)}</p>`;
       }
+    }
+
+    function jobsForFilter() {
+      return activeTechFilter ? visibleJobs.filter((j) => j.assigned_tech === activeTechFilter) : visibleJobs;
+    }
+
+    function renderCalendar() {
+      document.getElementById("calendar-month-label").textContent = currentMonth.toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+      });
+
+      const jobsByDate = new Map();
+      jobsForFilter().forEach((j) => {
+        const key = isoToDateInput(j.scheduled_start);
+        if (!jobsByDate.has(key)) jobsByDate.set(key, []);
+        jobsByDate.get(key).push(j);
+      });
+
+      const { gridStart, gridEnd } = gridRange();
+      const grid = document.getElementById("calendar-grid");
+      let html = "";
+      const cursor = new Date(gridStart);
+
+      while (cursor < gridEnd) {
+        const dateKey = isoToDateInput(cursor.toISOString());
+        const dayJobs = (jobsByDate.get(dateKey) || []).slice().sort((a, b) => a.scheduled_start.localeCompare(b.scheduled_start));
+        const isOtherMonth = cursor.getMonth() !== currentMonth.getMonth();
+        const classes = ["calendar-day"];
+        if (isOtherMonth) classes.push("other-month");
+        if (dateKey === todayKey) classes.push("is-today");
+        if (dateKey === selectedDateKey) classes.push("is-selected");
+
+        const shown = dayJobs.slice(0, 3);
+        const extra = dayJobs.length - shown.length;
+        const chipsHtml =
+          shown
+            .map(
+              (j) =>
+                `<div class="calendar-chip"><span class="calendar-chip-dot status-pill--${j.status}"></span>${formatTime(j.scheduled_start)} ${escapeHtml(customersById.get(j.customer_id) ? customersById.get(j.customer_id).name : "")}</div>`
+            )
+            .join("") + (extra > 0 ? `<div class="calendar-more">+${extra} more</div>` : "");
+
+        html += `
+          <button type="button" class="${classes.join(" ")}" data-date="${dateKey}">
+            <span class="calendar-day-number">${cursor.getDate()}</span>
+            ${chipsHtml}
+          </button>
+        `;
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      grid.innerHTML = html;
+      grid.querySelectorAll("[data-date]").forEach((cell) => {
+        cell.addEventListener("click", () => {
+          selectedDateKey = cell.getAttribute("data-date");
+          renderCalendar();
+          renderDayPanel();
+        });
+      });
+    }
+
+    function renderDayPanel() {
+      const heading = document.getElementById("day-panel-heading");
+      const panel = document.getElementById("day-panel-jobs");
+
+      if (!selectedDateKey) {
+        heading.textContent = "Jobs";
+        panel.innerHTML = `<p class="empty-text">Click a day to see its jobs.</p>`;
+        return;
+      }
+
+      const dayDate = new Date(`${selectedDateKey}T00:00`);
+      heading.textContent = `Jobs on ${formatDateHeading(dayDate.toISOString())}`;
+
+      const dayJobs = jobsForFilter()
+        .filter((j) => isoToDateInput(j.scheduled_start) === selectedDateKey)
+        .sort((a, b) => a.scheduled_start.localeCompare(b.scheduled_start));
+
+      if (dayJobs.length === 0) {
+        panel.innerHTML = `<p class="empty-text">No jobs on this day.</p>`;
+        return;
+      }
+
+      panel.innerHTML = dayJobs.map((j) => renderJobCard(j)).join("");
+      dayJobs.forEach((j) => wireJobCard(j));
     }
 
     function populateNewJobSelects() {
@@ -216,34 +320,10 @@
         btn.addEventListener("click", () => {
           activeTechFilter = btn.getAttribute("data-tech-filter");
           renderTechFilters();
-          renderJobsList();
+          renderCalendar();
+          renderDayPanel();
         });
       });
-    }
-
-    function renderJobsList() {
-      const list = document.getElementById("jobs-list");
-      const jobs = activeTechFilter
-        ? upcomingJobs.filter((j) => j.assigned_tech === activeTechFilter)
-        : upcomingJobs;
-
-      if (jobs.length === 0) {
-        list.innerHTML = `<p class="empty-text">No jobs in this date range.</p>`;
-        return;
-      }
-
-      let html = "";
-      let lastDateKey = null;
-      jobs.forEach((j) => {
-        const dateKey = isoToDateInput(j.scheduled_start);
-        if (dateKey !== lastDateKey) {
-          html += `<div class="date-heading">${formatDateHeading(j.scheduled_start)}</div>`;
-          lastDateKey = dateKey;
-        }
-        html += renderJobCard(j);
-      });
-      list.innerHTML = html;
-      jobs.forEach((j) => wireJobCard(j));
     }
 
     function renderJobCard(j) {
@@ -374,6 +454,32 @@
       });
     }
 
+    // ---- Month navigation ----
+
+    document.getElementById("calendar-prev-btn").addEventListener("click", () => {
+      currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+      afterMonthChange();
+    });
+
+    document.getElementById("calendar-next-btn").addEventListener("click", () => {
+      currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+      afterMonthChange();
+    });
+
+    document.getElementById("calendar-today-btn").addEventListener("click", () => {
+      currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      selectedDateKey = todayKey;
+      loadEverything();
+    });
+
+    function afterMonthChange() {
+      selectedDateKey =
+        today.getFullYear() === currentMonth.getFullYear() && today.getMonth() === currentMonth.getMonth()
+          ? todayKey
+          : null;
+      loadEverything();
+    }
+
     // ---- New job form ----
 
     document.getElementById("nj-customer").addEventListener("change", (event) => {
@@ -425,9 +531,8 @@
 
     showNewJobBtn.addEventListener("click", () => {
       if (newJobCard.style.display === "none") {
-        const now = new Date();
-        document.getElementById("nj-date").value = isoToDateInput(now.toISOString());
-        document.getElementById("nj-time").value = isoToTimeInput(now.toISOString());
+        document.getElementById("nj-date").value = selectedDateKey || todayKey;
+        document.getElementById("nj-time").value = isoToTimeInput(new Date().toISOString());
         newJobCard.style.display = "";
       } else {
         newJobCard.style.display = "none";

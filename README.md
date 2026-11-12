@@ -46,7 +46,7 @@ its own Team (paid) later if/when that separation matters enough to pay for.
 index.html          Sends you to login.html or dashboard.html
 login.html           Staff login page
 dashboard.html        Owner's "Today" dashboard; a tech's "My jobs today" list
-schedule.html          Jobs in a date range you pick (defaults to the next 30 days), owner only
+schedule.html          Month calendar of jobs — click a day to see/edit its jobs, owner only
 customers.html         List of customers, add a new one
 customer.html          One customer: their info and their vehicles
 packages.html          The package menu (owner only — names, prices, length, checklist)
