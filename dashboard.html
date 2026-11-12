@@ -14,12 +14,101 @@
   <div id="nav-container"></div>
 
   <div class="page-shell">
-    <h1 class="page-title">Dashboard</h1>
-    <div class="card">
-      <p id="greeting">Loading your profile...</p>
-      <p>This is still a placeholder dashboard. Phase 2 added the Customers
-         and Packages pages above — the real schedule, stat cards and job
-         list come in Phase 3.</p>
+    <!-- Tech view: kept as the simple phase 1 placeholder until Phase 4
+         builds the real tech job screen. -->
+    <div id="tech-view" class="card" style="display:none;">
+      <p id="tech-greeting"></p>
+      <p>The real tech job screen (status updates, timer, checklist,
+         before/after photos) comes in Phase 4. For now, ask the owner to
+         check the schedule for your jobs.</p>
+    </div>
+
+    <!-- Owner view: today's dashboard. -->
+    <div id="owner-view" style="display:none;">
+      <div class="page-header-row">
+        <h1 class="page-title">Today</h1>
+        <button class="btn btn-primary" id="show-new-job-btn">+ New job</button>
+      </div>
+
+      <div class="stat-cards">
+        <div class="card stat-card">
+          <div class="stat-label">Jobs today</div>
+          <div class="stat-value" id="stat-jobs-count">0</div>
+          <div class="stat-sub" id="stat-jobs-sub">&nbsp;</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Revenue today</div>
+          <div class="stat-value" id="stat-revenue">$0.00</div>
+          <div class="stat-sub">From jobs marked done</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">Tips today</div>
+          <div class="stat-value" id="stat-tips">$0.00</div>
+          <div class="stat-sub">From jobs marked done</div>
+        </div>
+      </div>
+
+      <div class="card" id="new-job-card" style="display:none;">
+        <h2 style="font-size:18px;">New job</h2>
+        <form id="new-job-form" class="inline-form">
+          <div class="field">
+            <label for="nj-customer">Customer</label>
+            <select id="nj-customer" required>
+              <option value="">Choose a customer...</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="nj-vehicle">Vehicle</label>
+            <select id="nj-vehicle" required disabled>
+              <option value="">Choose a customer first...</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="nj-package">Package</label>
+            <select id="nj-package" required>
+              <option value="">Choose a package...</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="nj-tech">Assigned tech</label>
+            <select id="nj-tech" required>
+              <option value="">Choose a tech...</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="nj-date">Date</label>
+            <input type="date" id="nj-date" required />
+          </div>
+          <div class="field">
+            <label for="nj-time">Time</label>
+            <input type="time" id="nj-time" required />
+          </div>
+          <div class="field">
+            <label for="nj-minutes">Estimated length (minutes)</label>
+            <input type="number" min="0" id="nj-minutes" />
+          </div>
+          <div class="field">
+            <label for="nj-price">Price ($)</label>
+            <input type="number" step="0.01" min="0" id="nj-price" />
+          </div>
+          <div class="field full">
+            <label for="nj-address">Job address</label>
+            <input type="text" id="nj-address" />
+          </div>
+          <p class="error-text" id="new-job-error"></p>
+          <div class="inline-form-actions">
+            <button type="submit" class="btn btn-primary" id="new-job-submit">Save job</button>
+            <button type="button" class="btn btn-secondary" id="new-job-cancel-btn">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="filter-row" id="tech-filter-row">
+          <button class="filter-btn active" data-tech-filter="">All</button>
+        </div>
+        <div id="jobs-list"><p class="empty-text">Loading today's jobs...</p></div>
+      </div>
     </div>
   </div>
 
@@ -28,19 +117,371 @@
   <script src="js/supabaseClient.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/util.js"></script>
+  <script src="js/customers.js"></script>
+  <script src="js/packages.js"></script>
+  <script src="js/jobs.js"></script>
   <script>
+    let customers = [];
+    let vehicles = [];
+    let packages = [];
+    let techs = [];
+    let todaysJobs = [];
+    let activeTechFilter = "";
+    const vehiclesByCustomer = new Map();
+    const customersById = new Map();
+    const vehiclesById = new Map();
+    const packagesById = new Map();
+    const techsById = new Map();
+
     (async () => {
       const profile = await requireStaffSession();
-      if (!profile) return; // requireStaffSession already redirected to login
+      if (!profile) return;
 
       document.getElementById("nav-container").innerHTML = renderNav(profile, "dashboard");
       wireNavLogout();
 
-      const greeting = document.getElementById("greeting");
-      greeting.innerHTML =
-        `Signed in as <strong>${escapeHtml(profile.name || "(no name set)")}</strong>` +
-        `<span class="role-badge">${escapeHtml(profile.role)}</span>`;
+      if (profile.role !== "owner") {
+        document.getElementById("tech-view").style.display = "";
+        document.getElementById("tech-greeting").innerHTML =
+          `Signed in as <strong>${escapeHtml(profile.name || "(no name set)")}</strong>` +
+          `<span class="role-badge">${escapeHtml(profile.role)}</span>`;
+        return;
+      }
+
+      document.getElementById("owner-view").style.display = "";
+      await loadEverything();
     })();
+
+    async function loadEverything() {
+      try {
+        const { startIso, endIso } = todayRangeIso();
+        const [c, v, p, t, jobs] = await Promise.all([
+          listCustomers(),
+          listAllVehicles(),
+          listPackages(),
+          listTechs(),
+          listJobsForRange(startIso, endIso),
+        ]);
+        customers = c;
+        vehicles = v;
+        packages = p;
+        techs = t;
+        todaysJobs = jobs;
+
+        customersById.clear();
+        customers.forEach((x) => customersById.set(x.id, x));
+        vehiclesById.clear();
+        vehiclesByCustomer.clear();
+        vehicles.forEach((x) => {
+          vehiclesById.set(x.id, x);
+          if (!vehiclesByCustomer.has(x.customer_id)) vehiclesByCustomer.set(x.customer_id, []);
+          vehiclesByCustomer.get(x.customer_id).push(x);
+        });
+        packagesById.clear();
+        packages.forEach((x) => packagesById.set(x.id, x));
+        techsById.clear();
+        techs.forEach((x) => techsById.set(x.id, x));
+
+        populateNewJobSelects();
+        renderTechFilters();
+        renderStats();
+        renderJobsList();
+      } catch (err) {
+        document.getElementById("jobs-list").innerHTML =
+          `<p class="error-text">Could not load the dashboard: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    function populateNewJobSelects() {
+      const customerSelect = document.getElementById("nj-customer");
+      customerSelect.innerHTML =
+        `<option value="">Choose a customer...</option>` +
+        customers.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+
+      const packageSelect = document.getElementById("nj-package");
+      packageSelect.innerHTML =
+        `<option value="">Choose a package...</option>` +
+        packages
+          .filter((p) => p.active)
+          .map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`)
+          .join("");
+
+      const techSelect = document.getElementById("nj-tech");
+      techSelect.innerHTML =
+        `<option value="">Choose a tech...</option>` +
+        techs.map((t) => `<option value="${t.id}">${escapeHtml(t.name || "(no name set)")}</option>`).join("");
+    }
+
+    function renderTechFilters() {
+      const row = document.getElementById("tech-filter-row");
+      row.innerHTML =
+        `<button class="filter-btn${activeTechFilter === "" ? " active" : ""}" data-tech-filter="">All</button>` +
+        techs
+          .map(
+            (t) =>
+              `<button class="filter-btn${activeTechFilter === t.id ? " active" : ""}" data-tech-filter="${t.id}">${escapeHtml(t.name || "(no name)")}</button>`
+          )
+          .join("");
+
+      row.querySelectorAll("[data-tech-filter]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activeTechFilter = btn.getAttribute("data-tech-filter");
+          renderTechFilters();
+          renderJobsList();
+        });
+      });
+    }
+
+    function renderStats() {
+      const doneJobs = todaysJobs.filter((j) => j.status === "done");
+      const inProgressCount = todaysJobs.filter((j) => j.status === "in_progress").length;
+      const revenue = doneJobs.reduce((sum, j) => sum + Number(j.price || 0), 0);
+      const tips = doneJobs.reduce((sum, j) => sum + Number(j.tip || 0), 0);
+
+      document.getElementById("stat-jobs-count").textContent = todaysJobs.length;
+      document.getElementById("stat-jobs-sub").textContent =
+        `${doneJobs.length} done · ${inProgressCount} in progress`;
+      document.getElementById("stat-revenue").textContent = formatMoney(revenue);
+      document.getElementById("stat-tips").textContent = formatMoney(tips);
+    }
+
+    function renderJobsList() {
+      const list = document.getElementById("jobs-list");
+      const jobs = activeTechFilter
+        ? todaysJobs.filter((j) => j.assigned_tech === activeTechFilter)
+        : todaysJobs;
+
+      if (jobs.length === 0) {
+        list.innerHTML = `<p class="empty-text">No jobs scheduled for today.</p>`;
+        return;
+      }
+
+      list.innerHTML = jobs.map((j) => renderJobCard(j)).join("");
+      jobs.forEach((j) => wireJobCard(j));
+    }
+
+    function renderJobCard(j) {
+      const customer = customersById.get(j.customer_id);
+      const vehicle = vehiclesById.get(j.vehicle_id);
+      const pkg = j.package_id ? packagesById.get(j.package_id) : null;
+      const tech = j.assigned_tech ? techsById.get(j.assigned_tech) : null;
+
+      return `
+        <div class="job-card" id="job-${j.id}">
+          <div class="view">
+            <div class="job-card-top">
+              <div class="job-card-main">
+                <p class="job-time">${formatTime(j.scheduled_start)} &middot; ${j.scheduled_minutes} min</p>
+                <p>${escapeHtml(customer ? customer.name : "Unknown customer")} &middot; ${escapeHtml(vehicle ? vehicleLabel(vehicle) : "Unknown vehicle")}</p>
+                <p>${escapeHtml(pkg ? pkg.name : "No package")} &middot; ${escapeHtml(j.address || "No address")}</p>
+                <p>Tech: ${escapeHtml(tech ? tech.name || "(no name)" : "Unassigned")} &middot; ${formatMoney(j.price)}${Number(j.tip) > 0 ? " + " + formatMoney(j.tip) + " tip" : ""}</p>
+              </div>
+              <div>
+                <span class="status-pill status-pill--${j.status}">${escapeHtml(jobStatusLabel(j.status))}</span>
+                <div class="row-actions" style="margin-top:10px;">
+                  <button type="button" class="btn btn-secondary" data-edit>Edit</button>
+                  <button type="button" class="btn btn-secondary" data-delete>Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <form class="inline-form edit-job-form" style="display:none;">
+            <div class="field">
+              <label>Date</label>
+              <input type="date" class="e-date" value="${isoToDateInput(j.scheduled_start)}" required />
+            </div>
+            <div class="field">
+              <label>Time</label>
+              <input type="time" class="e-time" value="${isoToTimeInput(j.scheduled_start)}" required />
+            </div>
+            <div class="field">
+              <label>Length (minutes)</label>
+              <input type="number" min="0" class="e-minutes" value="${j.scheduled_minutes}" />
+            </div>
+            <div class="field">
+              <label>Status</label>
+              <select class="e-status">
+                ${JOB_STATUSES.map((s) => `<option value="${s}"${s === j.status ? " selected" : ""}>${jobStatusLabel(s)}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label>Price ($)</label>
+              <input type="number" step="0.01" min="0" class="e-price" value="${j.price}" />
+            </div>
+            <div class="field">
+              <label>Tip ($)</label>
+              <input type="number" step="0.01" min="0" class="e-tip" value="${j.tip}" />
+            </div>
+            <div class="field">
+              <label>Assigned tech</label>
+              <select class="e-tech">
+                <option value="">Unassigned</option>
+                ${techs.map((t) => `<option value="${t.id}"${t.id === j.assigned_tech ? " selected" : ""}>${escapeHtml(t.name || "(no name)")}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field full">
+              <label>Job address</label>
+              <input type="text" class="e-address" value="${escapeHtml(j.address || "")}" />
+            </div>
+            <p class="error-text edit-job-error"></p>
+            <div class="inline-form-actions">
+              <button type="submit" class="btn btn-primary">Save changes</button>
+              <button type="button" class="btn btn-secondary" data-cancel>Cancel</button>
+            </div>
+          </form>
+        </div>
+      `;
+    }
+
+    function wireJobCard(j) {
+      const card = document.getElementById(`job-${j.id}`);
+
+      card.querySelector("[data-edit]").addEventListener("click", () => {
+        card.querySelector(".view").style.display = "none";
+        card.querySelector(".edit-job-form").style.display = "grid";
+      });
+
+      card.querySelector("[data-cancel]").addEventListener("click", () => {
+        card.querySelector(".view").style.display = "";
+        card.querySelector(".edit-job-form").style.display = "none";
+      });
+
+      card.querySelector("[data-delete]").addEventListener("click", async () => {
+        if (!window.confirm("Delete this job? This can't be undone.")) return;
+        try {
+          await deleteJob(j.id);
+          await loadEverything();
+        } catch (err) {
+          window.alert("Could not delete: " + err.message);
+        }
+      });
+
+      card.querySelector(".edit-job-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const errorEl = card.querySelector(".edit-job-error");
+        errorEl.textContent = "";
+
+        const newStatus = card.querySelector(".e-status").value;
+        const fields = {
+          scheduled_start: localInputsToIso(
+            card.querySelector(".e-date").value,
+            card.querySelector(".e-time").value
+          ),
+          scheduled_minutes: parseInt(card.querySelector(".e-minutes").value, 10) || 0,
+          status: newStatus,
+          price: parseFloat(card.querySelector(".e-price").value) || 0,
+          tip: parseFloat(card.querySelector(".e-tip").value) || 0,
+          assigned_tech: card.querySelector(".e-tech").value || null,
+          address: card.querySelector(".e-address").value.trim(),
+        };
+        if (newStatus === "in_progress" && !j.started_at) fields.started_at = new Date().toISOString();
+        if (newStatus === "done" && !j.finished_at) fields.finished_at = new Date().toISOString();
+
+        try {
+          await updateJob(j.id, fields);
+          await loadEverything();
+        } catch (err) {
+          errorEl.textContent = "Could not save: " + err.message;
+        }
+      });
+    }
+
+    // ---- New job form ----
+
+    document.getElementById("nj-customer").addEventListener("change", (event) => {
+      const customerId = event.target.value;
+      const vehicleSelect = document.getElementById("nj-vehicle");
+      const customerVehicles = vehiclesByCustomer.get(customerId) || [];
+
+      if (!customerId) {
+        vehicleSelect.innerHTML = `<option value="">Choose a customer first...</option>`;
+        vehicleSelect.disabled = true;
+      } else if (customerVehicles.length === 0) {
+        vehicleSelect.innerHTML = `<option value="">No vehicles on file — add one first</option>`;
+        vehicleSelect.disabled = true;
+      } else {
+        vehicleSelect.innerHTML =
+          `<option value="">Choose a vehicle...</option>` +
+          customerVehicles
+            .map((v) => `<option value="${v.id}">${escapeHtml(vehicleLabel(v))} (${vehicleSizeLabel(v.size)})</option>`)
+            .join("");
+        vehicleSelect.disabled = false;
+      }
+
+      const customer = customersById.get(customerId);
+      document.getElementById("nj-address").value = customer ? customer.address || "" : "";
+      autofillPriceAndMinutes();
+    });
+
+    document.getElementById("nj-vehicle").addEventListener("change", autofillPriceAndMinutes);
+    document.getElementById("nj-package").addEventListener("change", autofillPriceAndMinutes);
+
+    function autofillPriceAndMinutes() {
+      const vehicleId = document.getElementById("nj-vehicle").value;
+      const packageId = document.getElementById("nj-package").value;
+      const vehicle = vehiclesById.get(vehicleId);
+      const pkg = packagesById.get(packageId);
+      if (!pkg) return;
+
+      document.getElementById("nj-minutes").value = pkg.estimated_minutes;
+      if (vehicle) {
+        const priceKey = "price_" + vehicle.size;
+        document.getElementById("nj-price").value = pkg[priceKey] != null ? pkg[priceKey] : pkg.price_car;
+      }
+    }
+
+    const showNewJobBtn = document.getElementById("show-new-job-btn");
+    const newJobCard = document.getElementById("new-job-card");
+    const newJobForm = document.getElementById("new-job-form");
+    const newJobError = document.getElementById("new-job-error");
+
+    showNewJobBtn.addEventListener("click", () => {
+      if (newJobCard.style.display === "none") {
+        const now = new Date();
+        document.getElementById("nj-date").value = isoToDateInput(now.toISOString());
+        document.getElementById("nj-time").value = isoToTimeInput(now.toISOString());
+        newJobCard.style.display = "";
+      } else {
+        newJobCard.style.display = "none";
+      }
+    });
+
+    document.getElementById("new-job-cancel-btn").addEventListener("click", () => {
+      newJobForm.reset();
+      newJobCard.style.display = "none";
+      newJobError.textContent = "";
+    });
+
+    newJobForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      newJobError.textContent = "";
+      const submitBtn = document.getElementById("new-job-submit");
+      submitBtn.disabled = true;
+
+      try {
+        await createJob({
+          customer_id: document.getElementById("nj-customer").value,
+          vehicle_id: document.getElementById("nj-vehicle").value,
+          package_id: document.getElementById("nj-package").value,
+          assigned_tech: document.getElementById("nj-tech").value,
+          scheduled_start: localInputsToIso(
+            document.getElementById("nj-date").value,
+            document.getElementById("nj-time").value
+          ),
+          scheduled_minutes: parseInt(document.getElementById("nj-minutes").value, 10) || 60,
+          price: parseFloat(document.getElementById("nj-price").value) || 0,
+          address: document.getElementById("nj-address").value.trim(),
+        });
+        newJobForm.reset();
+        newJobCard.style.display = "none";
+        await loadEverything();
+      } catch (err) {
+        newJobError.textContent = "Could not save: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
   </script>
 </body>
 </html>

@@ -334,3 +334,119 @@ a:hover { color: var(--color-blue-dark); }
   border-radius: 999px;
   margin-left: 8px;
 }
+
+/* ---- Jobs / schedule (phase 3+) ---- */
+
+.status-pill {
+  display: inline-block;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.status-pill--scheduled { background: var(--status-scheduled); }
+.status-pill--on_the_way { background: var(--status-on-the-way); }
+.status-pill--in_progress { background: var(--status-in-progress); }
+.status-pill--done { background: var(--status-done); }
+.status-pill--cancelled { background: var(--color-warning); }
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-card .stat-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary);
+}
+
+.stat-card .stat-value {
+  font-family: var(--font-headline);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 32px;
+  color: var(--color-black);
+  margin-top: 6px;
+}
+
+.stat-card .stat-sub {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.filter-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-strong);
+  background: #fff;
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.filter-btn.active {
+  background: var(--color-blue);
+  border-color: var(--color-blue);
+  color: #fff;
+}
+
+.job-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.job-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.job-card-main p { margin: 2px 0; }
+
+.job-card .job-time {
+  font-weight: 700;
+}
+
+.job-card select.status-select {
+  min-height: 32px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border-strong);
+  font-size: 13px;
+  padding: 0 8px;
+}
+
+.date-heading {
+  margin: 24px 0 10px;
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+}
+
+.date-heading:first-child { margin-top: 0; }

@@ -4,9 +4,10 @@ A custom web portal for Prestige Auto Clean (mobile auto detailing): owner
 dashboard, tech job screen, and customer booking page. Built by Matt Obergas /
 City Park Solutions. Background and full plan: [PRESTIGE_BUILD_BRIEF.md](PRESTIGE_BUILD_BRIEF.md).
 
-**Phase 1 (accounts connected + staff login)** and **Phase 2 (customers,
-vehicles, packages)** are done. The real dashboard, schedule and job screens
-still don't exist yet — those are later phases.
+**Phase 1 (accounts connected + staff login)**, **Phase 2 (customers,
+vehicles, packages)**, and **Phase 3 (jobs and schedule)** are done. The tech
+job screen (status, timer, checklist, photos), the public booking page, and
+everything after are later phases.
 
 ## Current accounts (Phase 1 setup)
 
@@ -44,7 +45,8 @@ its own Team (paid) later if/when that separation matters enough to pay for.
 ```
 index.html          Sends you to login.html or dashboard.html
 login.html           Staff login page
-dashboard.html        Placeholder page (proves login + role works)
+dashboard.html        Owner's "Today" dashboard; a simple notice for techs for now
+schedule.html          All upcoming jobs (next 30 days), owner only
 customers.html         List of customers, add a new one
 customer.html          One customer: their info and their vehicles
 packages.html          The package menu (owner only — names, prices, length)
@@ -54,11 +56,13 @@ css/styles.css        Shared page styles
 js/config.js          Supabase project URL + public key (you fill this in)
 js/supabaseClient.js   Connects the pages to Supabase
 js/auth.js             Login / logout / "who's logged in" helpers
-js/util.js             Shared helpers (top nav bar, text escaping, etc.)
+js/util.js             Shared helpers (top nav bar, text escaping, date/time, etc.)
 js/customers.js         Customer + vehicle database calls
 js/packages.js          Package database calls
+js/jobs.js              Job database calls
 supabase/001_profiles_and_auth.sql              Database setup script for Phase 1
 supabase/002_customers_vehicles_packages.sql     Database setup script for Phase 2
+supabase/003_jobs.sql                            Database setup script for Phase 3
 ```
 
 ## Setup steps (already done — kept here for reference / a future handoff)
@@ -137,9 +141,31 @@ placeholder text instead of your real Supabase URL/key (Step 2.5).
    customer and try **+ Add vehicle**. A tech login can view this page but
    can't add, edit, or delete — only the owner can.
 
+### Step 6 — Phase 3 setup (jobs and schedule)
+
+1. In Supabase, click **SQL Editor** → **New query**.
+2. Open `supabase/003_jobs.sql` in this folder, copy everything in it,
+   paste it in, and click **Run**. This creates the jobs table and its
+   security rules.
+3. Log in as the owner on the live site. The **Dashboard** now shows
+   today's jobs, three stat cards (jobs today, revenue today, tips today —
+   revenue and tips only count jobs marked "Done"), and a **+ New job**
+   button. **Schedule** shows every upcoming job for the next 30 days.
+4. Creating a job needs at least one customer with a vehicle (Customers
+   page) and at least one tech login (Step 2.8) — add those first if you
+   haven't yet.
+5. Try **+ New job**: pick a customer, then one of their vehicles, then a
+   package (price and length fill in automatically from the package menu —
+   you can still edit them), a tech, and a date/time.
+6. On a job, **Edit** lets the owner change the date/time, length, price,
+   tip, assigned tech, address, or status (Scheduled → On the way → In
+   progress → Done, or Cancelled). A tech login can only see jobs assigned
+   to them — the real tech screen with status buttons and a timer comes in
+   Phase 4.
+
 ## What's next
 
-Phase 3 builds the real schedule: creating jobs, assigning techs, today's
-job list with status and filters, and the owner dashboard's stat cards. See
-`PRESTIGE_BUILD_BRIEF.md` for the full build order and the questions to
-confirm with the Prestige owner before each phase.
+Phase 4 builds the tech job screen: status updates, a timer, a per-package
+checklist, and before/after photo uploads. See `PRESTIGE_BUILD_BRIEF.md` for
+the full build order and the questions to confirm with the Prestige owner
+before each phase.

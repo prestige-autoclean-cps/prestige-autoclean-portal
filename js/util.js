@@ -18,12 +18,86 @@ function vehicleSizeLabel(size) {
   return { car: "Car", suv: "SUV", truck_van: "Truck / Van" }[size] || size;
 }
 
+// ---- Jobs / schedule helpers (phase 3+) ----
+
+const JOB_STATUSES = ["scheduled", "on_the_way", "in_progress", "done", "cancelled"];
+
+function jobStatusLabel(status) {
+  return (
+    {
+      scheduled: "Scheduled",
+      on_the_way: "On the way",
+      in_progress: "In progress",
+      done: "Done",
+      cancelled: "Cancelled",
+    }[status] || status
+  );
+}
+
+function startOfLocalDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Returns the [start, end) ISO range for "today" in the browser's local time.
+function todayRangeIso() {
+  const start = startOfLocalDay(new Date());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
+// Returns the [start, end) ISO range from the start of today through
+// `days` days ahead.
+function upcomingRangeIso(days) {
+  const start = startOfLocalDay(new Date());
+  const end = new Date(start);
+  end.setDate(end.getDate() + days);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
+function formatTime(iso) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function formatDateHeading(iso) {
+  return new Date(iso).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+// Combines separate <input type=date> and <input type=time> values (in the
+// browser's local time) into one UTC ISO timestamp for Supabase.
+function localInputsToIso(dateStr, timeStr) {
+  return new Date(`${dateStr}T${timeStr}`).toISOString();
+}
+
+function isoToDateInput(iso) {
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function isoToTimeInput(iso) {
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function vehicleLabel(v) {
+  return [v.year, v.make, v.model].filter(Boolean).join(" ") || "Vehicle";
+}
+
 // Builds the dark top nav bar shown on every staff page. Owner-only links
 // are left out entirely for a tech (RLS also blocks the underlying data,
 // this just keeps the tech's nav uncluttered).
 function renderNav(profile, activePage) {
   const links = [{ href: "dashboard.html", key: "dashboard", label: "Dashboard" }];
   if (profile.role === "owner") {
+    links.push({ href: "schedule.html", key: "schedule", label: "Schedule" });
     links.push({ href: "customers.html", key: "customers", label: "Customers" });
     links.push({ href: "packages.html", key: "packages", label: "Packages" });
   }
