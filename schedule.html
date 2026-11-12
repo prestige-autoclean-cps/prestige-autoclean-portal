@@ -18,7 +18,18 @@
       <h1 class="page-title">Schedule</h1>
       <button class="btn btn-primary" id="show-new-job-btn">+ New job</button>
     </div>
-    <p class="empty-text">Showing the next 30 days, starting today.</p>
+    <div class="card" style="margin-bottom:16px;">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+        <div class="field" style="margin-bottom:0;">
+          <label for="range-from">From</label>
+          <input type="date" id="range-from" />
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="range-to">To</label>
+          <input type="date" id="range-to" />
+        </div>
+      </div>
+    </div>
 
     <div class="card" id="new-job-card" style="display:none;">
       <h2 style="font-size:18px;">New job</h2>
@@ -117,12 +128,23 @@
       document.getElementById("nav-container").innerHTML = renderNav(profile, "schedule");
       wireNavLogout();
 
+      const { startIso: defaultFrom, endIso: defaultTo } = upcomingRangeIso(30);
+      document.getElementById("range-from").value = isoToDateInput(defaultFrom);
+      document.getElementById("range-to").value = isoToDateInput(
+        new Date(new Date(defaultTo).getTime() - 86400000).toISOString()
+      );
+      document.getElementById("range-from").addEventListener("change", loadEverything);
+      document.getElementById("range-to").addEventListener("change", loadEverything);
+
       await loadEverything();
     })();
 
     async function loadEverything() {
       try {
-        const { startIso, endIso } = upcomingRangeIso(30);
+        const { startIso, endIso } = dateRangeIso(
+          document.getElementById("range-from").value,
+          document.getElementById("range-to").value
+        );
         const [c, v, p, t, jobs] = await Promise.all([
           listCustomers(),
           listAllVehicles(),
@@ -206,7 +228,7 @@
         : upcomingJobs;
 
       if (jobs.length === 0) {
-        list.innerHTML = `<p class="empty-text">No upcoming jobs scheduled.</p>`;
+        list.innerHTML = `<p class="empty-text">No jobs in this date range.</p>`;
         return;
       }
 

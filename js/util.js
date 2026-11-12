@@ -57,6 +57,15 @@ function upcomingRangeIso(days) {
   return { startIso: start.toISOString(), endIso: end.toISOString() };
 }
 
+// Turns two <input type=date> values (inclusive, local time) into the
+// [start, end) ISO range Supabase queries expect.
+function dateRangeIso(fromDateStr, toDateStr) {
+  const start = startOfLocalDay(new Date(`${fromDateStr}T00:00`));
+  const end = startOfLocalDay(new Date(`${toDateStr}T00:00`));
+  end.setDate(end.getDate() + 1);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
