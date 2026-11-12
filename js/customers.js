@@ -36,6 +36,16 @@ async function deleteCustomer(id) {
   if (error) throw error;
 }
 
+async function getVehicle(id) {
+  const { data, error } = await supabaseClient
+    .from("vehicles")
+    .select("id, customer_id, year, make, model, color, plate_last, size, care_notes, created_at")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function listVehicles(customerId) {
   const { data, error } = await supabaseClient
     .from("vehicles")

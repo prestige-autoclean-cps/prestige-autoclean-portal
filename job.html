@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Job — Prestige Auto Clean</title>
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:ital,wght@1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="nav-container"></div>
+
+  <div class="page-shell">
+    <a class="back-link" href="dashboard.html">&larr; Back</a>
+    <p id="status-text" class="empty-text">Loading job...</p>
+
+    <div id="content" style="display:none;">
+      <div class="card">
+        <p class="empty-text" id="job-counter" style="display:none;"></p>
+        <div class="page-header-row">
+          <h1 class="page-title" id="job-package-name"></h1>
+          <span class="status-pill" id="job-status-pill"></span>
+        </div>
+        <p id="job-timer" style="font-size:20px;font-weight:700;"></p>
+        <p id="job-customer-vehicle"></p>
+        <p id="job-time-address"></p>
+
+        <div class="row-actions" style="margin-top:14px;">
+          <a class="btn btn-secondary" id="navigate-btn" target="_blank" rel="noopener">Navigate</a>
+          <a class="btn btn-secondary" id="call-btn">Call</a>
+          <button type="button" class="btn btn-secondary" id="notes-toggle-btn">Notes</button>
+        </div>
+
+        <div class="card" id="notes-panel" style="display:none; margin-top:14px; background:var(--color-bg);">
+          <p><strong>On-site notes:</strong> <span id="notes-customer"></span></p>
+          <p><strong>Vehicle care notes:</strong> <span id="notes-vehicle"></span></p>
+        </div>
+
+        <div style="margin-top:16px;">
+          <button type="button" class="btn btn-primary" id="status-action-btn"></button>
+          <p class="error-text" id="status-error"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:18px;" id="checklist-heading">Checklist</h2>
+        <div id="checklist-list"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:18px;">Before photos</h2>
+        <div class="photo-grid" id="before-photos"></div>
+        <label class="btn btn-secondary" style="margin-top:10px;display:inline-flex;">
+          + Take before photo
+          <input type="file" accept="image/*" capture="environment" id="before-photo-input" style="display:none;" />
+        </label>
+      </div>
+
+      <div class="card">
+        <h2 style="font-size:18px;">After photos</h2>
+        <div class="photo-grid" id="after-photos"></div>
+        <label class="btn btn-secondary" style="margin-top:10px;display:inline-flex;">
+          + Take after photo
+          <input type="file" accept="image/*" capture="environment" id="after-photo-input" style="display:none;" />
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/customers.js"></script>
+  <script src="js/packages.js"></script>
+  <script src="js/checklist.js"></script>
+  <script src="js/jobs.js"></script>
+  <script src="js/jobPhotos.js"></script>
+  <script>
+    const jobId = new URLSearchParams(window.location.search).get("id");
+    let currentProfile = null;
+    let job = null;
+    let timerHandle = null;
+
+    (async () => {
+      const profile = await requireStaffSession();
+      if (!profile) return;
+      currentProfile = profile;
+
+      document.getElementById("nav-container").innerHTML = renderNav(profile, "dashboard");
+      wireNavLogout();
+
+      if (!jobId) {
+        document.getElementById("status-text").textContent = "No job specified.";
+        return;
+      }
+
+      await loadJob();
+    })();
+
+    async function loadJob() {
+      const statusText = document.getElementById("status-text");
+      try {
+        job = await getJob(jobId);
+        const [customer, vehicle, pkg, checklistItems, photos] = await Promise.all([
+          getCustomer(job.customer_id),
+          getVehicle(job.vehicle_id),
+          job.package_id ? getPackage(job.package_id) : Promise.resolve(null),
+          listJobChecklistItems(jobId),
+          listJobPhotos(jobId),
+        ]);
+
+        renderJob(customer, vehicle, pkg);
+        renderChecklist(checklistItems);
+        renderPhotos(photos);
+
+        if (currentProfile.role === "tech" && job.assigned_tech === currentProfile.id) {
+          await renderJobCounter();
+        }
+
+        statusText.style.display = "none";
+        document.getElementById("content").style.display = "";
+        startTimerIfNeeded();
+      } catch (err) {
+        statusText.textContent = "Could not load this job: " + err.message;
+      }
+    }
+
+    async function renderJobCounter() {
+      try {
+        const { startIso, endIso } = todayRangeIso();
+        const todaysJobs = await listJobsForRange(startIso, endIso);
+        if (todaysJobs.length === 0) return;
+        const index = todaysJobs.findIndex((j) => j.id === job.id);
+        if (index === -1) return;
+        const el = document.getElementById("job-counter");
+        el.textContent = `Job ${index + 1} of ${todaysJobs.length} today`;
+        el.style.display = "";
+      } catch (err) {
+        // Not critical — leave the counter hidden if this fails.
+      }
+    }
+
+    function renderJob(customer, vehicle, pkg) {
+      document.getElementById("job-package-name").textContent = pkg ? pkg.name : "Job";
+      document.getElementById("job-customer-vehicle").textContent =
+        `${customer.name} · ${vehicleLabel(vehicle)}`;
+      document.getElementById("job-time-address").textContent =
+        `${formatTime(job.scheduled_start)} · ${job.address || "No address on file"}`;
+
+      const pill = document.getElementById("job-status-pill");
+      pill.textContent = jobStatusLabel(job.status);
+      pill.className = `status-pill status-pill--${job.status}`;
+
+      const navigateBtn = document.getElementById("navigate-btn");
+      if (job.address) {
+        navigateBtn.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`;
+      } else {
+        navigateBtn.style.display = "none";
+      }
+
+      const callBtn = document.getElementById("call-btn");
+      if (customer.phone) {
+        callBtn.href = `tel:${customer.phone.replace(/[^0-9+]/g, "")}`;
+      } else {
+        callBtn.style.display = "none";
+      }
+
+      document.getElementById("notes-customer").textContent = customer.notes || "None on file";
+      document.getElementById("notes-vehicle").textContent = vehicle.care_notes || "None on file";
+
+      renderStatusAction();
+    }
+
+    document.getElementById("notes-toggle-btn").addEventListener("click", () => {
+      const panel = document.getElementById("notes-panel");
+      panel.style.display = panel.style.display === "none" ? "" : "none";
+    });
+
+    function renderStatusAction() {
+      const btn = document.getElementById("status-action-btn");
+      const nextStep = {
+        scheduled: { label: "On my way", status: "on_the_way" },
+        on_the_way: { label: "Start job", status: "in_progress" },
+        in_progress: { label: "Finish job", status: "done" },
+      }[job.status];
+
+      if (!nextStep) {
+        btn.style.display = "none";
+        return;
+      }
+
+      btn.style.display = "";
+      btn.textContent = nextStep.label;
+      btn.onclick = async () => {
+        const errorEl = document.getElementById("status-error");
+        errorEl.textContent = "";
+        btn.disabled = true;
+        try {
+          const fields = { status: nextStep.status };
+          if (nextStep.status === "in_progress" && !job.started_at) fields.started_at = new Date().toISOString();
+          if (nextStep.status === "done" && !job.finished_at) fields.finished_at = new Date().toISOString();
+          await updateJob(job.id, fields);
+          await loadJob();
+        } catch (err) {
+          errorEl.textContent = "Could not update: " + err.message;
+        } finally {
+          btn.disabled = false;
+        }
+      };
+    }
+
+    function startTimerIfNeeded() {
+      if (timerHandle) clearInterval(timerHandle);
+      const timerEl = document.getElementById("job-timer");
+
+      if (job.status === "in_progress" && job.started_at) {
+        const update = () => {
+          timerEl.textContent = formatDuration(Date.now() - new Date(job.started_at).getTime());
+        };
+        update();
+        timerHandle = setInterval(update, 1000);
+      } else if (job.status === "done" && job.started_at && job.finished_at) {
+        timerEl.textContent =
+          "Total time: " + formatDuration(new Date(job.finished_at) - new Date(job.started_at));
+      } else {
+        timerEl.textContent = "";
+      }
+    }
+
+    function formatDuration(ms) {
+      const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+      const pad = (n) => String(n).padStart(2, "0");
+      return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+    }
+
+    function renderChecklist(items) {
+      const list = document.getElementById("checklist-list");
+      const heading = document.getElementById("checklist-heading");
+
+      if (items.length === 0) {
+        heading.textContent = "Checklist";
+        list.innerHTML = `<p class="empty-text">No checklist for this package.</p>`;
+        return;
+      }
+
+      const doneCount = items.filter((i) => i.done).length;
+      heading.textContent = `Checklist (${doneCount} of ${items.length})`;
+
+      list.innerHTML = items
+        .map(
+          (i) => `
+            <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--color-border);">
+              <input type="checkbox" data-item="${i.id}" ${i.done ? "checked" : ""} style="width:22px;height:22px;" />
+              <span>${escapeHtml(i.step_text)}</span>
+            </label>
+          `
+        )
+        .join("");
+
+      list.querySelectorAll("[data-item]").forEach((checkbox) => {
+        checkbox.addEventListener("change", async () => {
+          try {
+            await setJobChecklistItemDone(checkbox.getAttribute("data-item"), checkbox.checked);
+            const refreshed = await listJobChecklistItems(jobId);
+            renderChecklist(refreshed);
+          } catch (err) {
+            checkbox.checked = !checkbox.checked;
+            window.alert("Could not update checklist: " + err.message);
+          }
+        });
+      });
+    }
+
+    function renderPhotos(photos) {
+      renderPhotoGrid("before-photos", photos.filter((p) => p.kind === "before"));
+      renderPhotoGrid("after-photos", photos.filter((p) => p.kind === "after"));
+    }
+
+    function renderPhotoGrid(containerId, photos) {
+      const container = document.getElementById(containerId);
+      if (photos.length === 0) {
+        container.innerHTML = `<p class="empty-text">No photos yet.</p>`;
+        return;
+      }
+      container.innerHTML = photos
+        .map(
+          (p) => `
+            <div class="photo-thumb">
+              <img src="${jobPhotoUrl(p.storage_path)}" alt="Job photo" />
+              <button type="button" class="btn btn-secondary" data-delete-photo="${p.id}" data-photo-path="${p.storage_path}">Delete</button>
+            </div>
+          `
+        )
+        .join("");
+
+      container.querySelectorAll("[data-delete-photo]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!window.confirm("Delete this photo? This can't be undone.")) return;
+          try {
+            await deleteJobPhoto({ id: btn.getAttribute("data-delete-photo"), storage_path: btn.getAttribute("data-photo-path") });
+            const photos = await listJobPhotos(jobId);
+            renderPhotos(photos);
+          } catch (err) {
+            window.alert("Could not delete: " + err.message);
+          }
+        });
+      });
+    }
+
+    function wirePhotoInput(inputId, kind) {
+      document.getElementById(inputId).addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        event.target.value = "";
+        if (!file) return;
+        try {
+          await uploadJobPhoto(jobId, kind, file);
+          const photos = await listJobPhotos(jobId);
+          renderPhotos(photos);
+        } catch (err) {
+          window.alert("Could not upload photo: " + err.message);
+        }
+      });
+    }
+
+    wirePhotoInput("before-photo-input", "before");
+    wirePhotoInput("after-photo-input", "after");
+  </script>
+</body>
+</html>

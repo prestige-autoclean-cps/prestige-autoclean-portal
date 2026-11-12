@@ -10,6 +10,16 @@ async function listPackages() {
   return data;
 }
 
+async function getPackage(id) {
+  const { data, error } = await supabaseClient
+    .from("packages")
+    .select("id, name, description, price_car, price_suv, price_truck_van, estimated_minutes, active, created_at")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function createPackage(fields) {
   const { data, error } = await supabaseClient.from("packages").insert(fields).select().single();
   if (error) throw error;

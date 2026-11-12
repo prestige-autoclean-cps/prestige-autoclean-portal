@@ -14,13 +14,13 @@
   <div id="nav-container"></div>
 
   <div class="page-shell">
-    <!-- Tech view: kept as the simple phase 1 placeholder until Phase 4
-         builds the real tech job screen. -->
-    <div id="tech-view" class="card" style="display:none;">
-      <p id="tech-greeting"></p>
-      <p>The real tech job screen (status updates, timer, checklist,
-         before/after photos) comes in Phase 4. For now, ask the owner to
-         check the schedule for your jobs.</p>
+    <!-- Tech view: today's assigned jobs, linking into the job screen. -->
+    <div id="tech-view" style="display:none;">
+      <h1 class="page-title">My jobs today</h1>
+      <div class="card">
+        <p id="tech-greeting" class="empty-text"></p>
+        <div id="tech-jobs-list"><p class="empty-text">Loading...</p></div>
+      </div>
     </div>
 
     <!-- Owner view: today's dashboard. -->
@@ -119,6 +119,7 @@
   <script src="js/util.js"></script>
   <script src="js/customers.js"></script>
   <script src="js/packages.js"></script>
+  <script src="js/checklist.js"></script>
   <script src="js/jobs.js"></script>
   <script>
     let customers = [];
@@ -142,15 +143,64 @@
 
       if (profile.role !== "owner") {
         document.getElementById("tech-view").style.display = "";
-        document.getElementById("tech-greeting").innerHTML =
-          `Signed in as <strong>${escapeHtml(profile.name || "(no name set)")}</strong>` +
-          `<span class="role-badge">${escapeHtml(profile.role)}</span>`;
+        document.getElementById("tech-greeting").textContent =
+          `Signed in as ${profile.name || "(no name set)"}`;
+        await loadTechJobs();
         return;
       }
 
       document.getElementById("owner-view").style.display = "";
       await loadEverything();
     })();
+
+    async function loadTechJobs() {
+      const list = document.getElementById("tech-jobs-list");
+      try {
+        const { startIso, endIso } = todayRangeIso();
+        const [jobs, customers, vehicles, packages] = await Promise.all([
+          listJobsForRange(startIso, endIso),
+          listCustomers(),
+          listAllVehicles(),
+          listPackages(),
+        ]);
+
+        if (jobs.length === 0) {
+          list.innerHTML = `<p class="empty-text">No jobs assigned to you today.</p>`;
+          return;
+        }
+
+        const customersById = new Map(customers.map((c) => [c.id, c]));
+        const vehiclesById = new Map(vehicles.map((v) => [v.id, v]));
+        const packagesById = new Map(packages.map((p) => [p.id, p]));
+
+        list.innerHTML = jobs
+          .map((j) => {
+            const customer = customersById.get(j.customer_id);
+            const vehicle = vehiclesById.get(j.vehicle_id);
+            const pkg = j.package_id ? packagesById.get(j.package_id) : null;
+            return `
+              <div class="job-card">
+                <div class="job-card-top">
+                  <div class="job-card-main">
+                    <p class="job-time">${formatTime(j.scheduled_start)} &middot; ${j.scheduled_minutes} min</p>
+                    <p>${escapeHtml(customer ? customer.name : "Unknown customer")} &middot; ${escapeHtml(vehicle ? vehicleLabel(vehicle) : "Unknown vehicle")}</p>
+                    <p>${escapeHtml(pkg ? pkg.name : "No package")}</p>
+                  </div>
+                  <div>
+                    <span class="status-pill status-pill--${j.status}">${escapeHtml(jobStatusLabel(j.status))}</span>
+                    <div class="row-actions" style="margin-top:10px;">
+                      <a class="btn btn-primary" href="job.html?id=${encodeURIComponent(j.id)}">Open job</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      } catch (err) {
+        list.innerHTML = `<p class="error-text">Could not load your jobs: ${escapeHtml(err.message)}</p>`;
+      }
+    }
 
     async function loadEverything() {
       try {
@@ -279,6 +329,7 @@
               <div>
                 <span class="status-pill status-pill--${j.status}">${escapeHtml(jobStatusLabel(j.status))}</span>
                 <div class="row-actions" style="margin-top:10px;">
+                  <a class="btn btn-secondary" href="job.html?id=${encodeURIComponent(j.id)}">View job</a>
                   <button type="button" class="btn btn-secondary" data-edit>Edit</button>
                   <button type="button" class="btn btn-secondary" data-delete>Delete</button>
                 </div>
@@ -460,7 +511,7 @@
       submitBtn.disabled = true;
 
       try {
-        await createJob({
+        await createJobWithChecklist({
           customer_id: document.getElementById("nj-customer").value,
           vehicle_id: document.getElementById("nj-vehicle").value,
           package_id: document.getElementById("nj-package").value,

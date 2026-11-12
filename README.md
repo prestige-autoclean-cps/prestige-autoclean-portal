@@ -4,10 +4,10 @@ A custom web portal for Prestige Auto Clean (mobile auto detailing): owner
 dashboard, tech job screen, and customer booking page. Built by Matt Obergas /
 City Park Solutions. Background and full plan: [PRESTIGE_BUILD_BRIEF.md](PRESTIGE_BUILD_BRIEF.md).
 
-**Phase 1 (accounts connected + staff login)**, **Phase 2 (customers,
-vehicles, packages)**, and **Phase 3 (jobs and schedule)** are done. The tech
-job screen (status, timer, checklist, photos), the public booking page, and
-everything after are later phases.
+**Phases 1–4** are done: accounts + staff login, customers/vehicles/packages,
+jobs and schedule, and the tech job screen (status, timer, checklist,
+before/after photos). The public booking page and everything after are
+later phases.
 
 ## Current accounts (Phase 1 setup)
 
@@ -45,11 +45,12 @@ its own Team (paid) later if/when that separation matters enough to pay for.
 ```
 index.html          Sends you to login.html or dashboard.html
 login.html           Staff login page
-dashboard.html        Owner's "Today" dashboard; a simple notice for techs for now
+dashboard.html        Owner's "Today" dashboard; a tech's "My jobs today" list
 schedule.html          All upcoming jobs (next 30 days), owner only
 customers.html         List of customers, add a new one
 customer.html          One customer: their info and their vehicles
-packages.html          The package menu (owner only — names, prices, length)
+packages.html          The package menu (owner only — names, prices, length, checklist)
+job.html               One job: status, timer, checklist, before/after photos
 assets/logo.png       Prestige Auto Clean logo
 css/variables.css     Colors, fonts, sizes — the brand "tokens"
 css/styles.css        Shared page styles
@@ -60,9 +61,12 @@ js/util.js             Shared helpers (top nav bar, text escaping, date/time, et
 js/customers.js         Customer + vehicle database calls
 js/packages.js          Package database calls
 js/jobs.js              Job database calls
+js/checklist.js         Checklist template + per-job checklist database calls
+js/jobPhotos.js         Before/after photo upload + database calls
 supabase/001_profiles_and_auth.sql              Database setup script for Phase 1
 supabase/002_customers_vehicles_packages.sql     Database setup script for Phase 2
 supabase/003_jobs.sql                            Database setup script for Phase 3
+supabase/004_tech_job_screen.sql                 Database setup script for Phase 4
 ```
 
 ## Setup steps (already done — kept here for reference / a future handoff)
@@ -163,9 +167,36 @@ placeholder text instead of your real Supabase URL/key (Step 2.5).
    to them — the real tech screen with status buttons and a timer comes in
    Phase 4.
 
+### Step 7 — Phase 4 setup (tech job screen)
+
+1. In Supabase, click **SQL Editor** → **New query**.
+2. Open `supabase/004_tech_job_screen.sql` in this folder, copy everything
+   in it, paste it in, and click **Run**. This creates the checklist and
+   photo tables, lets a tech update the status of their own jobs (nothing
+   else — an owner still controls price, address, assignment, etc.), and
+   sets up a Storage "bucket" (a folder for uploaded files) for job photos.
+3. On the **Packages** page, click **Checklist** on each package and add
+   the steps a tech should follow for it (e.g. "Before photos", "Vacuum
+   interior", "Wipe down dash"). These only apply to jobs created *after*
+   you add them — existing jobs keep whatever checklist they were created
+   with. There's no reorder button yet; delete and re-add a step to move
+   it.
+4. Log in as a **tech** on the live site. The dashboard now shows "My jobs
+   today" instead of the old placeholder — click **Open job** on one.
+5. Try the flow: **On my way** → **Start job** (starts a live timer) →
+   check off checklist steps → take a **before** and **after** photo (on a
+   phone this opens the camera) → **Finish job**.
+6. As the owner, open that same job from the Dashboard or Schedule (**View
+   job**) — you can see the tech's checklist progress and photos, and still
+   use **Edit** to change price, address, or anything else a tech can't.
+
+Payment collection at the "Finish job" step and texting the customer come
+later (Phases 7–8), once Stripe and Twilio are connected.
+
 ## What's next
 
-Phase 4 builds the tech job screen: status updates, a timer, a per-package
-checklist, and before/after photo uploads. See `PRESTIGE_BUILD_BRIEF.md` for
-the full build order and the questions to confirm with the Prestige owner
-before each phase.
+Phase 5 builds the public booking page: customers choose a package and time
+without logging in, and the request shows up on the owner dashboard to
+accept, decline, or reschedule. See `PRESTIGE_BUILD_BRIEF.md` for the full
+build order and the questions to confirm with the Prestige owner before
+each phase.

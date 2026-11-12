@@ -90,6 +90,7 @@
   <script src="js/util.js"></script>
   <script src="js/customers.js"></script>
   <script src="js/packages.js"></script>
+  <script src="js/checklist.js"></script>
   <script src="js/jobs.js"></script>
   <script>
     let customers = [];
@@ -242,6 +243,7 @@
               <div>
                 <span class="status-pill status-pill--${j.status}">${escapeHtml(jobStatusLabel(j.status))}</span>
                 <div class="row-actions" style="margin-top:10px;">
+                  <a class="btn btn-secondary" href="job.html?id=${encodeURIComponent(j.id)}">View job</a>
                   <button type="button" class="btn btn-secondary" data-edit>Edit</button>
                   <button type="button" class="btn btn-secondary" data-delete>Delete</button>
                 </div>
@@ -423,7 +425,7 @@
       submitBtn.disabled = true;
 
       try {
-        await createJob({
+        await createJobWithChecklist({
           customer_id: document.getElementById("nj-customer").value,
           vehicle_id: document.getElementById("nj-vehicle").value,
           package_id: document.getElementById("nj-package").value,

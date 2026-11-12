@@ -18,10 +18,40 @@ async function listJobsForRange(startIso, endIso) {
   return data;
 }
 
+async function getJob(id) {
+  const { data, error } = await supabaseClient
+    .from("jobs")
+    .select(
+      "id, customer_id, vehicle_id, package_id, assigned_tech, scheduled_start, " +
+        "scheduled_minutes, address, status, price, tip, payment_status, started_at, finished_at"
+    )
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 async function createJob(fields) {
   const { data, error } = await supabaseClient.from("jobs").insert(fields).select().single();
   if (error) throw error;
   return data;
+}
+
+// Creates the job, then copies that package's checklist_templates steps
+// into job_checklist_items for this specific job (see js/checklist.js).
+async function createJobWithChecklist(fields) {
+  const job = await createJob(fields);
+
+  if (fields.package_id) {
+    const steps = await listChecklistTemplate(fields.package_id);
+    if (steps.length > 0) {
+      const rows = steps.map((s) => ({ job_id: job.id, step_order: s.step_order, step_text: s.step_text }));
+      const { error } = await supabaseClient.from("job_checklist_items").insert(rows);
+      if (error) throw error;
+    }
+  }
+
+  return job;
 }
 
 async function updateJob(id, fields) {

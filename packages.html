@@ -63,6 +63,7 @@
   <script src="js/auth.js"></script>
   <script src="js/util.js"></script>
   <script src="js/packages.js"></script>
+  <script src="js/checklist.js"></script>
   <script>
     let isOwner = false;
 
@@ -120,6 +121,7 @@
             event.preventDefault();
             await saveEdit(p.id, card);
           });
+          card.querySelector("[data-toggle-checklist]").addEventListener("click", () => toggleChecklistPanel(p.id));
         });
       } catch (err) {
         list.innerHTML = `<div class="card"><p class="error-text">Could not load packages: ${escapeHtml(err.message)}</p></div>`;
@@ -133,6 +135,7 @@
           <div class="row-actions" style="margin-top:12px;">
             <button type="button" class="btn btn-secondary" data-edit>Edit</button>
             <button type="button" class="btn btn-secondary" data-toggle-active>${p.active ? "Mark inactive" : "Mark active"}</button>
+            <button type="button" class="btn btn-secondary" data-toggle-checklist>Checklist</button>
             <button type="button" class="btn btn-secondary" data-delete>Delete</button>
           </div>
         `
@@ -150,6 +153,7 @@
               &middot; ~${p.estimated_minutes} min
             </p>
             ${ownerControls}
+            <div class="checklist-panel" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--color-border);"></div>
           </div>
 
           <form class="inline-form edit-form" style="display:none;">
@@ -212,6 +216,79 @@
       } catch (err) {
         errorEl.textContent = "Could not save: " + err.message;
       }
+    }
+
+    async function toggleChecklistPanel(packageId) {
+      const card = document.getElementById(`package-${packageId}`);
+      const panel = card.querySelector(".checklist-panel");
+
+      if (panel.style.display !== "none") {
+        panel.style.display = "none";
+        return;
+      }
+
+      panel.style.display = "";
+      panel.innerHTML = `<p class="empty-text">Loading checklist...</p>`;
+      try {
+        const steps = await listChecklistTemplate(packageId);
+        renderChecklistPanel(packageId, panel, steps);
+      } catch (err) {
+        panel.innerHTML = `<p class="error-text">Could not load checklist: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    function renderChecklistPanel(packageId, panel, steps) {
+      const stepsHtml =
+        steps.length === 0
+          ? `<p class="empty-text">No checklist steps yet.</p>`
+          : `<ol>` +
+            steps
+              .map(
+                (s) => `
+                  <li style="margin-bottom:6px;">
+                    ${escapeHtml(s.step_text)}
+                    <button type="button" class="btn btn-secondary" data-delete-step="${s.id}" style="min-height:28px;padding:0 10px;font-size:13px;margin-left:8px;">Remove</button>
+                  </li>
+                `
+              )
+              .join("") +
+            `</ol>`;
+
+      panel.innerHTML = `
+        <h3 style="font-size:15px;margin-bottom:10px;">Checklist steps</h3>
+        ${stepsHtml}
+        <form class="add-step-form" style="display:flex;gap:8px;margin-top:10px;">
+          <input type="text" class="new-step-text" placeholder="Add a step..." style="flex:1;min-height:36px;padding:0 10px;border-radius:var(--radius-control);border:1px solid var(--color-border-strong);" required />
+          <button type="submit" class="btn btn-secondary">Add</button>
+        </form>
+        <p class="error-text checklist-error"></p>
+      `;
+
+      panel.querySelectorAll("[data-delete-step]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          try {
+            await deleteChecklistStep(btn.getAttribute("data-delete-step"));
+            const steps = await listChecklistTemplate(packageId);
+            renderChecklistPanel(packageId, panel, steps);
+          } catch (err) {
+            panel.querySelector(".checklist-error").textContent = "Could not remove: " + err.message;
+          }
+        });
+      });
+
+      panel.querySelector(".add-step-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const input = panel.querySelector(".new-step-text");
+        const text = input.value.trim();
+        if (!text) return;
+        try {
+          await addChecklistStep(packageId, text);
+          const steps = await listChecklistTemplate(packageId);
+          renderChecklistPanel(packageId, panel, steps);
+        } catch (err) {
+          panel.querySelector(".checklist-error").textContent = "Could not add: " + err.message;
+        }
+      });
     }
 
     const showAddFormBtn = document.getElementById("show-add-form-btn");
