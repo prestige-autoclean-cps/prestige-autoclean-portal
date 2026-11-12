@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Customers — Prestige Auto Clean</title>
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:ital,wght@1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="nav-container"></div>
+
+  <div class="page-shell">
+    <div class="page-header-row">
+      <h1 class="page-title">Customers</h1>
+      <button class="btn btn-primary" id="show-add-form-btn">+ Add customer</button>
+    </div>
+
+    <div class="card">
+      <p id="status-text" class="empty-text">Loading customers...</p>
+      <div class="table-wrap" id="table-wrap" style="display:none;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th>Area</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="customers-body"></tbody>
+        </table>
+      </div>
+
+      <form id="add-form" class="inline-form" style="display:none;">
+        <div class="field">
+          <label for="add-name">Name</label>
+          <input type="text" id="add-name" required />
+        </div>
+        <div class="field">
+          <label for="add-phone">Phone</label>
+          <input type="text" id="add-phone" />
+        </div>
+        <div class="field">
+          <label for="add-email">Email</label>
+          <input type="email" id="add-email" />
+        </div>
+        <div class="field">
+          <label for="add-area">Area (city / ZIP)</label>
+          <input type="text" id="add-area" />
+        </div>
+        <div class="field full">
+          <label for="add-address">Address</label>
+          <input type="text" id="add-address" />
+        </div>
+        <div class="field full">
+          <label for="add-notes">On-site notes (spigot, gate, pets, etc.)</label>
+          <textarea id="add-notes"></textarea>
+        </div>
+        <p class="error-text" id="add-error"></p>
+        <div class="inline-form-actions">
+          <button type="submit" class="btn btn-primary" id="add-submit">Save customer</button>
+          <button type="button" class="btn btn-secondary" id="add-cancel-btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/customers.js"></script>
+  <script>
+    let currentProfile = null;
+
+    (async () => {
+      const profile = await requireStaffSession();
+      if (!profile) return;
+      currentProfile = profile;
+
+      document.getElementById("nav-container").innerHTML = renderNav(profile, "customers");
+      wireNavLogout();
+
+      if (profile.role === "owner") {
+        document.getElementById("show-add-form-btn").style.display = "";
+      } else {
+        document.getElementById("show-add-form-btn").style.display = "none";
+      }
+
+      await loadCustomers();
+    })();
+
+    async function loadCustomers() {
+      const statusText = document.getElementById("status-text");
+      const tableWrap = document.getElementById("table-wrap");
+      const body = document.getElementById("customers-body");
+
+      try {
+        const customers = await listCustomers();
+        if (customers.length === 0) {
+          statusText.textContent = "No customers yet. Add the first one above.";
+          tableWrap.style.display = "none";
+          return;
+        }
+
+        body.innerHTML = customers
+          .map(
+            (c) => `
+              <tr>
+                <td><a href="customer.html?id=${encodeURIComponent(c.id)}">${escapeHtml(c.name)}</a></td>
+                <td>${escapeHtml(c.phone || "")}</td>
+                <td>${escapeHtml(c.email || "")}</td>
+                <td>${escapeHtml(c.area || "")}</td>
+                <td><a href="customer.html?id=${encodeURIComponent(c.id)}">View</a></td>
+              </tr>
+            `
+          )
+          .join("");
+
+        statusText.style.display = "none";
+        tableWrap.style.display = "";
+      } catch (err) {
+        statusText.textContent = "Could not load customers: " + err.message;
+      }
+    }
+
+    const showAddFormBtn = document.getElementById("show-add-form-btn");
+    const addForm = document.getElementById("add-form");
+    const addError = document.getElementById("add-error");
+
+    showAddFormBtn.addEventListener("click", () => {
+      addForm.style.display = addForm.style.display === "none" ? "grid" : "none";
+    });
+
+    document.getElementById("add-cancel-btn").addEventListener("click", () => {
+      addForm.reset();
+      addForm.style.display = "none";
+      addError.textContent = "";
+    });
+
+    addForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      addError.textContent = "";
+      const submitBtn = document.getElementById("add-submit");
+      submitBtn.disabled = true;
+
+      try {
+        await createCustomer({
+          name: document.getElementById("add-name").value.trim(),
+          phone: document.getElementById("add-phone").value.trim(),
+          email: document.getElementById("add-email").value.trim(),
+          area: document.getElementById("add-area").value.trim(),
+          address: document.getElementById("add-address").value.trim(),
+          notes: document.getElementById("add-notes").value.trim(),
+        });
+        addForm.reset();
+        addForm.style.display = "none";
+        await loadCustomers();
+      } catch (err) {
+        addError.textContent = "Could not save: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

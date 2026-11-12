@@ -11,14 +11,15 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <div class="stub-page">
-    <img src="assets/logo.png" alt="Prestige Auto Clean" style="max-width:180px;" />
+  <div id="nav-container"></div>
+
+  <div class="page-shell">
+    <h1 class="page-title">Dashboard</h1>
     <div class="card">
-      <h2>Phase 1 check: login works</h2>
       <p id="greeting">Loading your profile...</p>
-      <p>This placeholder page proves staff login and roles are wired up.
-         The real owner dashboard and tech job screen replace this in later phases.</p>
-      <button class="btn btn-secondary" id="logout-btn">Sign out</button>
+      <p>This is still a placeholder dashboard. Phase 2 added the Customers
+         and Packages pages above — the real schedule, stat cards and job
+         list come in Phase 3.</p>
     </div>
   </div>
 
@@ -26,25 +27,20 @@
   <script src="js/config.js"></script>
   <script src="js/supabaseClient.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/util.js"></script>
   <script>
     (async () => {
       const profile = await requireStaffSession();
       if (!profile) return; // requireStaffSession already redirected to login
+
+      document.getElementById("nav-container").innerHTML = renderNav(profile, "dashboard");
+      wireNavLogout();
 
       const greeting = document.getElementById("greeting");
       greeting.innerHTML =
         `Signed in as <strong>${escapeHtml(profile.name || "(no name set)")}</strong>` +
         `<span class="role-badge">${escapeHtml(profile.role)}</span>`;
     })();
-
-    document.getElementById("logout-btn").addEventListener("click", logoutStaff);
-
-    // Minimal HTML escaping for free-text fields (name, etc.) shown on the page.
-    function escapeHtml(str) {
-      const div = document.createElement("div");
-      div.textContent = str;
-      return div.innerHTML;
-    }
   </script>
 </body>
 </html>

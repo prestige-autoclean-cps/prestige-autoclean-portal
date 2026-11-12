@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Packages — Prestige Auto Clean</title>
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:ital,wght@1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="nav-container"></div>
+
+  <div class="page-shell">
+    <div class="page-header-row">
+      <h1 class="page-title">Packages</h1>
+      <button class="btn btn-primary" id="show-add-form-btn">+ Add package</button>
+    </div>
+
+    <p id="owner-only-text" class="card" style="display:none;">
+      Only the owner can manage the package menu.
+    </p>
+
+    <div id="packages-list"></div>
+
+    <div class="card" id="add-card" style="display:none;">
+      <h2>New package</h2>
+      <form id="add-form" class="inline-form">
+        <div class="field full">
+          <label for="add-name">Name</label>
+          <input type="text" id="add-name" required />
+        </div>
+        <div class="field full">
+          <label for="add-description">Description</label>
+          <textarea id="add-description"></textarea>
+        </div>
+        <div class="field full">
+          <label>Price by vehicle size</label>
+          <div class="size-price-grid">
+            <input type="number" step="0.01" min="0" id="add-price-car" placeholder="Car" />
+            <input type="number" step="0.01" min="0" id="add-price-suv" placeholder="SUV" />
+            <input type="number" step="0.01" min="0" id="add-price-truck-van" placeholder="Truck / Van" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="add-minutes">Estimated length (minutes)</label>
+          <input type="number" min="0" id="add-minutes" value="60" />
+        </div>
+        <p class="error-text" id="add-error"></p>
+        <div class="inline-form-actions">
+          <button type="submit" class="btn btn-primary" id="add-submit">Save package</button>
+          <button type="button" class="btn btn-secondary" id="add-cancel-btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/packages.js"></script>
+  <script>
+    let isOwner = false;
+
+    (async () => {
+      const profile = await requireStaffSession();
+      if (!profile) return;
+      isOwner = profile.role === "owner";
+
+      document.getElementById("nav-container").innerHTML = renderNav(profile, "packages");
+      wireNavLogout();
+
+      if (!isOwner) {
+        document.getElementById("show-add-form-btn").style.display = "none";
+        document.getElementById("owner-only-text").style.display = "";
+      }
+
+      await loadPackages();
+    })();
+
+    async function loadPackages() {
+      const list = document.getElementById("packages-list");
+      try {
+        const packages = await listPackages();
+        if (packages.length === 0) {
+          list.innerHTML = `<div class="card"><p class="empty-text">No packages yet. Add the first one.</p></div>`;
+          return;
+        }
+
+        list.innerHTML = packages.map((p) => renderPackageCard(p)).join("");
+
+        packages.forEach((p) => {
+          const card = document.getElementById(`package-${p.id}`);
+          if (!isOwner) return;
+
+          card.querySelector("[data-edit]").addEventListener("click", () => openEditForm(p));
+          card.querySelector("[data-cancel]").addEventListener("click", () => closeEditForm(p.id));
+          card.querySelector("[data-delete]").addEventListener("click", async () => {
+            if (!window.confirm(`Delete "${p.name}"? This can't be undone.`)) return;
+            try {
+              await deletePackage(p.id);
+              await loadPackages();
+            } catch (err) {
+              window.alert("Could not delete: " + err.message);
+            }
+          });
+          card.querySelector("[data-toggle-active]").addEventListener("click", async () => {
+            try {
+              await updatePackage(p.id, { active: !p.active });
+              await loadPackages();
+            } catch (err) {
+              window.alert("Could not update: " + err.message);
+            }
+          });
+          card.querySelector("form").addEventListener("submit", async (event) => {
+            event.preventDefault();
+            await saveEdit(p.id, card);
+          });
+        });
+      } catch (err) {
+        list.innerHTML = `<div class="card"><p class="error-text">Could not load packages: ${escapeHtml(err.message)}</p></div>`;
+      }
+    }
+
+    function renderPackageCard(p) {
+      const inactiveBadge = p.active ? "" : `<span class="inactive-pill">Inactive</span>`;
+      const ownerControls = isOwner
+        ? `
+          <div class="row-actions" style="margin-top:12px;">
+            <button type="button" class="btn btn-secondary" data-edit>Edit</button>
+            <button type="button" class="btn btn-secondary" data-toggle-active>${p.active ? "Mark inactive" : "Mark active"}</button>
+            <button type="button" class="btn btn-secondary" data-delete>Delete</button>
+          </div>
+        `
+        : "";
+
+      return `
+        <div class="card" id="package-${p.id}" style="margin-bottom:16px;">
+          <div class="view">
+            <h2 style="font-size:18px;">${escapeHtml(p.name)}${inactiveBadge}</h2>
+            <p>${escapeHtml(p.description || "")}</p>
+            <p>
+              Car: ${formatMoney(p.price_car)} &middot;
+              SUV: ${formatMoney(p.price_suv)} &middot;
+              Truck/Van: ${formatMoney(p.price_truck_van)}
+              &middot; ~${p.estimated_minutes} min
+            </p>
+            ${ownerControls}
+          </div>
+
+          <form class="inline-form edit-form" style="display:none;">
+            <div class="field full">
+              <label>Name</label>
+              <input type="text" class="e-name" value="${escapeHtml(p.name)}" required />
+            </div>
+            <div class="field full">
+              <label>Description</label>
+              <textarea class="e-description">${escapeHtml(p.description || "")}</textarea>
+            </div>
+            <div class="field full">
+              <label>Price by vehicle size</label>
+              <div class="size-price-grid">
+                <input type="number" step="0.01" min="0" class="e-price-car" placeholder="Car" value="${p.price_car}" />
+                <input type="number" step="0.01" min="0" class="e-price-suv" placeholder="SUV" value="${p.price_suv}" />
+                <input type="number" step="0.01" min="0" class="e-price-truck-van" placeholder="Truck / Van" value="${p.price_truck_van}" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Estimated length (minutes)</label>
+              <input type="number" min="0" class="e-minutes" value="${p.estimated_minutes}" />
+            </div>
+            <p class="error-text edit-error"></p>
+            <div class="inline-form-actions">
+              <button type="submit" class="btn btn-primary">Save changes</button>
+              <button type="button" class="btn btn-secondary" data-cancel>Cancel</button>
+            </div>
+          </form>
+        </div>
+      `;
+    }
+
+    function openEditForm(p) {
+      const card = document.getElementById(`package-${p.id}`);
+      card.querySelector(".view").style.display = "none";
+      card.querySelector(".edit-form").style.display = "grid";
+    }
+
+    function closeEditForm(id) {
+      const card = document.getElementById(`package-${id}`);
+      card.querySelector(".view").style.display = "";
+      card.querySelector(".edit-form").style.display = "none";
+      card.querySelector(".edit-error").textContent = "";
+    }
+
+    async function saveEdit(id, card) {
+      const errorEl = card.querySelector(".edit-error");
+      errorEl.textContent = "";
+      try {
+        await updatePackage(id, {
+          name: card.querySelector(".e-name").value.trim(),
+          description: card.querySelector(".e-description").value.trim(),
+          price_car: parseFloat(card.querySelector(".e-price-car").value) || 0,
+          price_suv: parseFloat(card.querySelector(".e-price-suv").value) || 0,
+          price_truck_van: parseFloat(card.querySelector(".e-price-truck-van").value) || 0,
+          estimated_minutes: parseInt(card.querySelector(".e-minutes").value, 10) || 0,
+        });
+        await loadPackages();
+      } catch (err) {
+        errorEl.textContent = "Could not save: " + err.message;
+      }
+    }
+
+    const showAddFormBtn = document.getElementById("show-add-form-btn");
+    const addCard = document.getElementById("add-card");
+    const addForm = document.getElementById("add-form");
+    const addError = document.getElementById("add-error");
+
+    showAddFormBtn.addEventListener("click", () => {
+      addCard.style.display = addCard.style.display === "none" ? "" : "none";
+    });
+
+    document.getElementById("add-cancel-btn").addEventListener("click", () => {
+      addForm.reset();
+      addCard.style.display = "none";
+      addError.textContent = "";
+    });
+
+    addForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      addError.textContent = "";
+      const submitBtn = document.getElementById("add-submit");
+      submitBtn.disabled = true;
+
+      try {
+        await createPackage({
+          name: document.getElementById("add-name").value.trim(),
+          description: document.getElementById("add-description").value.trim(),
+          price_car: parseFloat(document.getElementById("add-price-car").value) || 0,
+          price_suv: parseFloat(document.getElementById("add-price-suv").value) || 0,
+          price_truck_van: parseFloat(document.getElementById("add-price-truck-van").value) || 0,
+          estimated_minutes: parseInt(document.getElementById("add-minutes").value, 10) || 0,
+        });
+        addForm.reset();
+        addCard.style.display = "none";
+        await loadPackages();
+      } catch (err) {
+        addError.textContent = "Could not save: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

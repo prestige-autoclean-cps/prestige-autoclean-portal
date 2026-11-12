@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Customer — Prestige Auto Clean</title>
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:ital,wght@1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="nav-container"></div>
+
+  <div class="page-shell">
+    <a class="back-link" href="customers.html">&larr; All customers</a>
+    <p id="status-text" class="empty-text">Loading...</p>
+
+    <div id="content" style="display:none;">
+      <div class="page-header-row">
+        <h1 class="page-title" id="customer-name"></h1>
+      </div>
+
+      <div class="card">
+        <div id="customer-view"></div>
+
+        <form id="edit-form" class="inline-form" style="display:none;">
+          <div class="field">
+            <label for="edit-name">Name</label>
+            <input type="text" id="edit-name" required />
+          </div>
+          <div class="field">
+            <label for="edit-phone">Phone</label>
+            <input type="text" id="edit-phone" />
+          </div>
+          <div class="field">
+            <label for="edit-email">Email</label>
+            <input type="email" id="edit-email" />
+          </div>
+          <div class="field">
+            <label for="edit-area">Area (city / ZIP)</label>
+            <input type="text" id="edit-area" />
+          </div>
+          <div class="field full">
+            <label for="edit-address">Address</label>
+            <input type="text" id="edit-address" />
+          </div>
+          <div class="field full">
+            <label for="edit-notes">On-site notes (spigot, gate, pets, etc.)</label>
+            <textarea id="edit-notes"></textarea>
+          </div>
+          <p class="error-text" id="edit-error"></p>
+          <div class="inline-form-actions">
+            <button type="submit" class="btn btn-primary" id="edit-submit">Save changes</button>
+            <button type="button" class="btn btn-secondary" id="edit-cancel-btn">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="page-header-row">
+          <h2>Vehicles</h2>
+          <button class="btn btn-primary" id="show-add-vehicle-btn">+ Add vehicle</button>
+        </div>
+
+        <div id="vehicles-list"><p class="empty-text">No vehicles yet.</p></div>
+
+        <form id="add-vehicle-form" class="inline-form" style="display:none;">
+          <div class="field">
+            <label for="v-year">Year</label>
+            <input type="text" id="v-year" />
+          </div>
+          <div class="field">
+            <label for="v-make">Make</label>
+            <input type="text" id="v-make" />
+          </div>
+          <div class="field">
+            <label for="v-model">Model</label>
+            <input type="text" id="v-model" />
+          </div>
+          <div class="field">
+            <label for="v-color">Color</label>
+            <input type="text" id="v-color" />
+          </div>
+          <div class="field">
+            <label for="v-plate">Plate (last digits)</label>
+            <input type="text" id="v-plate" maxlength="6" />
+          </div>
+          <div class="field">
+            <label for="v-size">Size</label>
+            <select id="v-size">
+              <option value="car">Car</option>
+              <option value="suv">SUV</option>
+              <option value="truck_van">Truck / Van</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label for="v-notes">Care notes (e.g. ceramic coated, pH-neutral soap only)</label>
+            <textarea id="v-notes"></textarea>
+          </div>
+          <p class="error-text" id="add-vehicle-error"></p>
+          <div class="inline-form-actions">
+            <button type="submit" class="btn btn-primary" id="add-vehicle-submit">Save vehicle</button>
+            <button type="button" class="btn btn-secondary" id="add-vehicle-cancel-btn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/customers.js"></script>
+  <script>
+    const customerId = new URLSearchParams(window.location.search).get("id");
+    let currentProfile = null;
+    let currentCustomer = null;
+    let isOwner = false;
+
+    (async () => {
+      const profile = await requireStaffSession();
+      if (!profile) return;
+      currentProfile = profile;
+      isOwner = profile.role === "owner";
+
+      document.getElementById("nav-container").innerHTML = renderNav(profile, "customers");
+      wireNavLogout();
+
+      if (!isOwner) document.getElementById("show-add-vehicle-btn").style.display = "none";
+
+      if (!customerId) {
+        document.getElementById("status-text").textContent = "No customer specified.";
+        return;
+      }
+
+      await loadCustomer();
+      await loadVehicles();
+    })();
+
+    async function loadCustomer() {
+      const statusText = document.getElementById("status-text");
+      try {
+        currentCustomer = await getCustomer(customerId);
+        document.getElementById("customer-name").textContent = currentCustomer.name;
+        renderCustomerView();
+        statusText.style.display = "none";
+        document.getElementById("content").style.display = "";
+      } catch (err) {
+        statusText.textContent = "Could not load this customer: " + err.message;
+      }
+    }
+
+    function renderCustomerView() {
+      const c = currentCustomer;
+      const view = document.getElementById("customer-view");
+      const editBtnHtml = isOwner ? `<button class="btn btn-secondary" id="edit-toggle-btn">Edit</button>` : "";
+      view.innerHTML = `
+        <div class="page-header-row">
+          <div></div>
+          ${editBtnHtml}
+        </div>
+        <p><strong>Phone:</strong> ${escapeHtml(c.phone || "—")}</p>
+        <p><strong>Email:</strong> ${escapeHtml(c.email || "—")}</p>
+        <p><strong>Area:</strong> ${escapeHtml(c.area || "—")}</p>
+        <p><strong>Address:</strong> ${escapeHtml(c.address || "—")}</p>
+        <p><strong>On-site notes:</strong> ${escapeHtml(c.notes || "—")}</p>
+      `;
+
+      if (isOwner) {
+        document.getElementById("edit-toggle-btn").addEventListener("click", openEditForm);
+      }
+    }
+
+    function openEditForm() {
+      const c = currentCustomer;
+      document.getElementById("edit-name").value = c.name || "";
+      document.getElementById("edit-phone").value = c.phone || "";
+      document.getElementById("edit-email").value = c.email || "";
+      document.getElementById("edit-area").value = c.area || "";
+      document.getElementById("edit-address").value = c.address || "";
+      document.getElementById("edit-notes").value = c.notes || "";
+      document.getElementById("customer-view").style.display = "none";
+      document.getElementById("edit-form").style.display = "grid";
+    }
+
+    document.getElementById("edit-cancel-btn").addEventListener("click", () => {
+      document.getElementById("edit-form").style.display = "none";
+      document.getElementById("customer-view").style.display = "";
+      document.getElementById("edit-error").textContent = "";
+    });
+
+    document.getElementById("edit-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const editError = document.getElementById("edit-error");
+      editError.textContent = "";
+      const submitBtn = document.getElementById("edit-submit");
+      submitBtn.disabled = true;
+
+      try {
+        await updateCustomer(customerId, {
+          name: document.getElementById("edit-name").value.trim(),
+          phone: document.getElementById("edit-phone").value.trim(),
+          email: document.getElementById("edit-email").value.trim(),
+          area: document.getElementById("edit-area").value.trim(),
+          address: document.getElementById("edit-address").value.trim(),
+          notes: document.getElementById("edit-notes").value.trim(),
+        });
+        document.getElementById("edit-form").style.display = "none";
+        document.getElementById("customer-view").style.display = "";
+        await loadCustomer();
+      } catch (err) {
+        editError.textContent = "Could not save: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    async function loadVehicles() {
+      const list = document.getElementById("vehicles-list");
+      try {
+        const vehicles = await listVehicles(customerId);
+        if (vehicles.length === 0) {
+          list.innerHTML = `<p class="empty-text">No vehicles yet.</p>`;
+          return;
+        }
+
+        list.innerHTML = vehicles
+          .map(
+            (v) => `
+              <div class="card" style="margin-bottom:12px;">
+                <p><strong>${escapeHtml([v.year, v.make, v.model].filter(Boolean).join(" ") || "Vehicle")}</strong>
+                   &middot; ${escapeHtml(vehicleSizeLabel(v.size))}</p>
+                <p>Color: ${escapeHtml(v.color || "—")} &middot; Plate ends: ${escapeHtml(v.plate_last || "—")}</p>
+                <p>Care notes: ${escapeHtml(v.care_notes || "—")}</p>
+                ${
+                  isOwner
+                    ? `<div class="row-actions">
+                         <button class="btn btn-secondary" data-delete-vehicle="${v.id}">Delete</button>
+                       </div>`
+                    : ""
+                }
+              </div>
+            `
+          )
+          .join("");
+
+        if (isOwner) {
+          list.querySelectorAll("[data-delete-vehicle]").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              if (!window.confirm("Delete this vehicle? This can't be undone.")) return;
+              try {
+                await deleteVehicle(btn.getAttribute("data-delete-vehicle"));
+                await loadVehicles();
+              } catch (err) {
+                window.alert("Could not delete: " + err.message);
+              }
+            });
+          });
+        }
+      } catch (err) {
+        list.innerHTML = `<p class="error-text">Could not load vehicles: ${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    const showAddVehicleBtn = document.getElementById("show-add-vehicle-btn");
+
+    showAddVehicleBtn.addEventListener("click", () => {
+      const form = document.getElementById("add-vehicle-form");
+      form.style.display = form.style.display === "none" ? "grid" : "none";
+    });
+
+    document.getElementById("add-vehicle-cancel-btn").addEventListener("click", () => {
+      const form = document.getElementById("add-vehicle-form");
+      form.reset();
+      form.style.display = "none";
+      document.getElementById("add-vehicle-error").textContent = "";
+    });
+
+    document.getElementById("add-vehicle-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const addVehicleError = document.getElementById("add-vehicle-error");
+      addVehicleError.textContent = "";
+      const submitBtn = document.getElementById("add-vehicle-submit");
+      submitBtn.disabled = true;
+
+      try {
+        await createVehicle({
+          customer_id: customerId,
+          year: document.getElementById("v-year").value.trim(),
+          make: document.getElementById("v-make").value.trim(),
+          model: document.getElementById("v-model").value.trim(),
+          color: document.getElementById("v-color").value.trim(),
+          plate_last: document.getElementById("v-plate").value.trim(),
+          size: document.getElementById("v-size").value,
+          care_notes: document.getElementById("v-notes").value.trim(),
+        });
+        document.getElementById("add-vehicle-form").reset();
+        document.getElementById("add-vehicle-form").style.display = "none";
+        await loadVehicles();
+      } catch (err) {
+        addVehicleError.textContent = "Could not save: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
