@@ -101,6 +101,7 @@ function renderNav(profile, activePage) {
     links.push({ href: "customers.html", key: "customers", label: "Customers" });
     links.push({ href: "packages.html", key: "packages", label: "Packages" });
     links.push({ href: "availability.html", key: "availability", label: "Availability" });
+    links.push({ href: "team.html", key: "team", label: "Team" });
   }
 
   const linkHtml = links

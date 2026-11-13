@@ -6,8 +6,11 @@ City Park Solutions. Background and full plan: [PRESTIGE_BUILD_BRIEF.md](PRESTIG
 
 **Phases 1–5** are done: accounts + staff login, customers/vehicles/packages,
 jobs and schedule, the tech job screen (status, timer, checklist,
-before/after photos), and the public booking page. Supplies, payments,
-texting/email, and the revenue page are later phases.
+before/after photos), and the public booking page. There's also a **Team**
+page (add/remove tech logins, reset passwords) that wasn't in the original
+numbered phases. Payments, texting/email, and the revenue page are still
+ahead; supplies/inventory tracking was skipped since it isn't useful for
+Prestige.
 
 ## Current accounts (Phase 1 setup)
 
@@ -53,6 +56,7 @@ packages.html          The package menu (owner only — names, prices, length, c
 job.html               One job: status, timer, checklist, before/after photos
 book.html              Public booking page — no login, anyone with the link can use it
 availability.html      Owner sets weekly business hours, used by the booking page
+team.html              Owner adds/removes tech logins and resets passwords
 assets/logo.png       Prestige Auto Clean logo
 css/variables.css     Colors, fonts, sizes — the brand "tokens"
 css/styles.css        Shared page styles
@@ -67,6 +71,8 @@ js/checklist.js         Checklist template + per-job checklist database calls
 js/jobPhotos.js         Before/after photo upload + database calls
 js/bookingRequests.js   Public booking submissions + owner accept/decline/suggest actions
 js/businessHours.js     Weekly hours + available-time-slot calculation
+js/team.js              Staff list/edit + calls to the team-admin edge function
+supabase/functions/team-admin/index.ts           Server-side code for adding/removing techs
 supabase/001_profiles_and_auth.sql              Database setup script for Phase 1
 supabase/002_customers_vehicles_packages.sql     Database setup script for Phase 2
 supabase/003_jobs.sql                            Database setup script for Phase 3
@@ -242,9 +248,44 @@ The booking page itself has no login and no CAPTCHA/spam protection — fine
 for trying it out, but worth adding some basic abuse protection before
 sharing the link publicly and relying on it.
 
+### Step 9 — Team page setup (add/remove techs, reset passwords)
+
+Until now, adding a tech meant going into Supabase's Authentication panel
+yourself. The Team page does this from inside the portal instead — but
+creating or deleting a login needs Supabase's "secret" key, which (per the
+rule at the top of this README) must never sit in the browser code. So
+this one feature needs a small piece of **server-side code** — a Supabase
+"Edge Function" — that holds the secret key instead.
+
+1. In Supabase, click **Edge Functions** in the left sidebar.
+2. Click **Deploy a new function**, then choose the option to write it
+   **in the browser** (sometimes labeled "Via Editor"), not the command-line
+   option.
+3. Name it exactly `team-admin`.
+4. Open `supabase/functions/team-admin/index.ts` in this folder, copy
+   everything in it, and paste it into the editor, replacing whatever
+   placeholder code was there.
+5. Click **Deploy**. Supabase automatically gives this function the keys
+   it needs — you don't need to paste any secret yourself.
+6. Log in as the **owner** on the live site and click **Team** in the top
+   bar. Try **+ Add tech**: fill in a name and a temporary password, and
+   share the email/password with the real person directly (there's no
+   "forgot password" page yet).
+7. Try **Reset password** and **Remove** on a tech you added to confirm
+   those work too. (The owner's own account can't be removed or
+   password-reset from this page — that still goes through Supabase
+   directly, same as Step 2.)
+
+If **+ Add tech** (or Reset/Remove) gives an error mentioning "Edge
+Function" or a network failure, the most common cause is the function
+name not being exactly `team-admin`, or the deploy from step 5 not having
+finished yet.
+
 ## What's next
 
-Phase 6 adds supply/inventory tracking per van, with usage logged from jobs
-and low-stock alerts. See `PRESTIGE_BUILD_BRIEF.md` for the full build
-order and the questions to confirm with the Prestige owner before each
-phase.
+Phase 7 (payments via Stripe) and Phase 8 (texting/email via Twilio and
+Resend) are the next big pieces, followed by the revenue page (Phase 9).
+Supplies/inventory tracking (the original Phase 6) is being skipped since
+it isn't useful for Prestige's business. See `PRESTIGE_BUILD_BRIEF.md` for
+the full build order and the questions to confirm with the Prestige owner
+before each phase.

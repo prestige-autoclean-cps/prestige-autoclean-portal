@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Team — Prestige Auto Clean</title>
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:ital,wght@1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="nav-container"></div>
+
+  <div class="page-shell">
+    <div class="page-header-row">
+      <h1 class="page-title">Team</h1>
+      <button class="btn btn-primary" id="show-add-form-btn">+ Add tech</button>
+    </div>
+
+    <p id="owner-only-text" class="card" style="display:none;">
+      Only the owner can manage the team.
+    </p>
+
+    <div id="team-list"></div>
+
+    <div class="card" id="add-card" style="display:none;">
+      <h2 style="font-size:18px;">New tech login</h2>
+      <form id="add-form" class="inline-form">
+        <div class="field">
+          <label for="add-name">Name</label>
+          <input type="text" id="add-name" required />
+        </div>
+        <div class="field">
+          <label for="add-phone">Phone</label>
+          <input type="text" id="add-phone" />
+        </div>
+        <div class="field">
+          <label for="add-van">Van</label>
+          <input type="text" id="add-van" placeholder="e.g. Van 1" />
+        </div>
+        <div class="field">
+          <label for="add-email">Login email</label>
+          <input type="email" id="add-email" required />
+        </div>
+        <div class="field">
+          <label for="add-password">Temporary password</label>
+          <input type="text" id="add-password" required minlength="6" />
+        </div>
+        <p class="empty-text" style="grid-column:1/-1;">
+          Share the email and password with them directly — there's no
+          "forgot password" page yet, so if they lose it, come back here and
+          use Reset password.
+        </p>
+        <p class="error-text" id="add-error"></p>
+        <div class="inline-form-actions">
+          <button type="submit" class="btn btn-primary" id="add-submit">Create login</button>
+          <button type="button" class="btn btn-secondary" id="add-cancel-btn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/team.js"></script>
+  <script>
+    let isOwner = false;
+    let currentUserId = null;
+
+    (async () => {
+      const profile = await requireStaffSession();
+      if (!profile) return;
+      isOwner = profile.role === "owner";
+      currentUserId = profile.id;
+
+      document.getElementById("nav-container").innerHTML = renderNav(profile, "team");
+      wireNavLogout();
+
+      if (!isOwner) {
+        document.getElementById("show-add-form-btn").style.display = "none";
+        document.getElementById("owner-only-text").style.display = "";
+        return;
+      }
+
+      await loadTeam();
+    })();
+
+    async function loadTeam() {
+      const list = document.getElementById("team-list");
+      try {
+        const staff = await listStaff();
+        list.innerHTML = staff.map((s) => renderStaffCard(s)).join("");
+
+        staff.forEach((s) => {
+          const card = document.getElementById(`staff-${s.id}`);
+          card.querySelector("[data-edit]").addEventListener("click", () => openEditForm(s));
+          card.querySelector("[data-cancel]").addEventListener("click", () => closeEditForm(s.id));
+          card.querySelector("form").addEventListener("submit", async (event) => {
+            event.preventDefault();
+            await saveEdit(s.id, card);
+          });
+
+          const removeBtn = card.querySelector("[data-remove]");
+          if (removeBtn) {
+            removeBtn.addEventListener("click", async () => {
+              if (!window.confirm(`Remove ${s.name || "this tech"}'s login? They won't be able to log in anymore.`)) return;
+              try {
+                await removeStaffLogin(s.id);
+                await loadTeam();
+              } catch (err) {
+                window.alert("Could not remove: " + err.message);
+              }
+            });
+          }
+
+          const resetBtn = card.querySelector("[data-reset]");
+          if (resetBtn) {
+            resetBtn.addEventListener("click", () => {
+              const newPassword = window.prompt(`New temporary password for ${s.name || "this tech"} (at least 6 characters):`);
+              if (!newPassword) return;
+              resetStaffPassword(s.id, newPassword)
+                .then(() => window.alert("Password updated. Share the new password with them directly."))
+                .catch((err) => window.alert("Could not reset password: " + err.message));
+            });
+          }
+        });
+      } catch (err) {
+        list.innerHTML = `<div class="card"><p class="error-text">Could not load the team: ${escapeHtml(err.message)}</p></div>`;
+      }
+    }
+
+    function renderStaffCard(s) {
+      const isTech = s.role === "tech";
+      const techButtons = isTech
+        ? `
+          <button type="button" class="btn btn-secondary" data-reset>Reset password</button>
+          <button type="button" class="btn btn-secondary" data-remove>Remove</button>
+        `
+        : "";
+
+      return `
+        <div class="card" id="staff-${s.id}" style="margin-bottom:16px;">
+          <div class="view">
+            <h2 style="font-size:18px;">${escapeHtml(s.name || "(no name set)")}<span class="role-badge">${escapeHtml(s.role)}</span></h2>
+            <p>Phone: ${escapeHtml(s.phone || "—")}</p>
+            <p>Van: ${escapeHtml(s.van || "—")}</p>
+            <div class="row-actions" style="margin-top:12px;">
+              <button type="button" class="btn btn-secondary" data-edit>Edit</button>
+              ${techButtons}
+            </div>
+          </div>
+
+          <form class="inline-form edit-form" style="display:none;">
+            <div class="field">
+              <label>Name</label>
+              <input type="text" class="e-name" value="${escapeHtml(s.name || "")}" required />
+            </div>
+            <div class="field">
+              <label>Phone</label>
+              <input type="text" class="e-phone" value="${escapeHtml(s.phone || "")}" />
+            </div>
+            <div class="field">
+              <label>Van</label>
+              <input type="text" class="e-van" value="${escapeHtml(s.van || "")}" />
+            </div>
+            <p class="error-text edit-error"></p>
+            <div class="inline-form-actions">
+              <button type="submit" class="btn btn-primary">Save changes</button>
+              <button type="button" class="btn btn-secondary" data-cancel>Cancel</button>
+            </div>
+          </form>
+        </div>
+      `;
+    }
+
+    function openEditForm(s) {
+      const card = document.getElementById(`staff-${s.id}`);
+      card.querySelector(".view").style.display = "none";
+      card.querySelector(".edit-form").style.display = "grid";
+    }
+
+    function closeEditForm(id) {
+      const card = document.getElementById(`staff-${id}`);
+      card.querySelector(".view").style.display = "";
+      card.querySelector(".edit-form").style.display = "none";
+      card.querySelector(".edit-error").textContent = "";
+    }
+
+    async function saveEdit(id, card) {
+      const errorEl = card.querySelector(".edit-error");
+      errorEl.textContent = "";
+      try {
+        await updateStaffProfile(id, {
+          name: card.querySelector(".e-name").value.trim(),
+          phone: card.querySelector(".e-phone").value.trim(),
+          van: card.querySelector(".e-van").value.trim(),
+        });
+        await loadTeam();
+      } catch (err) {
+        errorEl.textContent = "Could not save: " + err.message;
+      }
+    }
+
+    const showAddFormBtn = document.getElementById("show-add-form-btn");
+    const addCard = document.getElementById("add-card");
+    const addForm = document.getElementById("add-form");
+    const addError = document.getElementById("add-error");
+
+    showAddFormBtn.addEventListener("click", () => {
+      addCard.style.display = addCard.style.display === "none" ? "" : "none";
+    });
+
+    document.getElementById("add-cancel-btn").addEventListener("click", () => {
+      addForm.reset();
+      addCard.style.display = "none";
+      addError.textContent = "";
+    });
+
+    addForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      addError.textContent = "";
+      const submitBtn = document.getElementById("add-submit");
+      submitBtn.disabled = true;
+
+      try {
+        await createTech({
+          name: document.getElementById("add-name").value.trim(),
+          phone: document.getElementById("add-phone").value.trim(),
+          van: document.getElementById("add-van").value.trim(),
+          email: document.getElementById("add-email").value.trim(),
+          password: document.getElementById("add-password").value,
+        });
+        addForm.reset();
+        addCard.style.display = "none";
+        await loadTeam();
+      } catch (err) {
+        addError.textContent = "Could not create login: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
