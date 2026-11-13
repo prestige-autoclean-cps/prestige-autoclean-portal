@@ -4,10 +4,10 @@ A custom web portal for Prestige Auto Clean (mobile auto detailing): owner
 dashboard, tech job screen, and customer booking page. Built by Matt Obergas /
 City Park Solutions. Background and full plan: [PRESTIGE_BUILD_BRIEF.md](PRESTIGE_BUILD_BRIEF.md).
 
-**Phases 1–4** are done: accounts + staff login, customers/vehicles/packages,
-jobs and schedule, and the tech job screen (status, timer, checklist,
-before/after photos). The public booking page and everything after are
-later phases.
+**Phases 1–5** are done: accounts + staff login, customers/vehicles/packages,
+jobs and schedule, the tech job screen (status, timer, checklist,
+before/after photos), and the public booking page. Supplies, payments,
+texting/email, and the revenue page are later phases.
 
 ## Current accounts (Phase 1 setup)
 
@@ -51,6 +51,7 @@ customers.html         List of customers, add a new one
 customer.html          One customer: their info and their vehicles
 packages.html          The package menu (owner only — names, prices, length, checklist)
 job.html               One job: status, timer, checklist, before/after photos
+book.html              Public booking page — no login, anyone with the link can use it
 assets/logo.png       Prestige Auto Clean logo
 css/variables.css     Colors, fonts, sizes — the brand "tokens"
 css/styles.css        Shared page styles
@@ -63,10 +64,12 @@ js/packages.js          Package database calls
 js/jobs.js              Job database calls
 js/checklist.js         Checklist template + per-job checklist database calls
 js/jobPhotos.js         Before/after photo upload + database calls
+js/bookingRequests.js   Public booking submissions + owner accept/decline/suggest actions
 supabase/001_profiles_and_auth.sql              Database setup script for Phase 1
 supabase/002_customers_vehicles_packages.sql     Database setup script for Phase 2
 supabase/003_jobs.sql                            Database setup script for Phase 3
 supabase/004_tech_job_screen.sql                 Database setup script for Phase 4
+supabase/005_booking_requests.sql                Database setup script for Phase 5
 ```
 
 ## Setup steps (already done — kept here for reference / a future handoff)
@@ -193,10 +196,44 @@ placeholder text instead of your real Supabase URL/key (Step 2.5).
 Payment collection at the "Finish job" step and texting the customer come
 later (Phases 7–8), once Stripe and Twilio are connected.
 
+### Step 8 — Phase 5 setup (public booking page)
+
+1. In Supabase, click **SQL Editor** → **New query**.
+2. Open `supabase/005_booking_requests.sql` in this folder, copy everything
+   in it, paste it in, and click **Run**. This lets anyone see your active
+   packages and their prices without logging in (needed for the booking
+   page), and creates the table that holds booking requests.
+3. The booking page lives at `book.html` on your live site — for example
+   `https://your-site.vercel.app/book.html`. This is the link to share with
+   customers (on your website, social media, a QR code on a card, etc.).
+   Anyone with this link can submit a request; they never see or touch
+   anything else in the portal.
+4. Try it yourself: open that link, pick a package, vehicle size, a day and
+   morning/afternoon, fill in your info and address, check the water/power
+   box, and submit.
+5. Log in as the **owner** — the Dashboard now shows a **New booking
+   requests** card above "New job" when there's a pending request. Try:
+   - **Accept & assign**: pick the exact date/time, a tech, and confirm the
+     length/price (pre-filled from the package) — this creates a real job
+     and a customer record if one doesn't already exist for that phone
+     number (it always adds a new vehicle, since the booking page only asks
+     for size — add year/make/model on the Customers page afterward if you
+     want them on file).
+   - **Suggest time**: saves a different day/time and a note for you to
+     call or text them about — it doesn't message them automatically yet
+     (that's Phase 8).
+   - **Decline**: removes it from the list.
+6. Only **pending** (brand-new) requests show on the dashboard. Accepted,
+   declined, or "suggested a time" requests disappear from that list for
+   now — there's no history view for them yet.
+
+The booking page itself has no login and no CAPTCHA/spam protection — fine
+for trying it out, but worth adding some basic abuse protection before
+sharing the link publicly and relying on it.
+
 ## What's next
 
-Phase 5 builds the public booking page: customers choose a package and time
-without logging in, and the request shows up on the owner dashboard to
-accept, decline, or reschedule. See `PRESTIGE_BUILD_BRIEF.md` for the full
-build order and the questions to confirm with the Prestige owner before
-each phase.
+Phase 6 adds supply/inventory tracking per van, with usage logged from jobs
+and low-stock alerts. See `PRESTIGE_BUILD_BRIEF.md` for the full build
+order and the questions to confirm with the Prestige owner before each
+phase.

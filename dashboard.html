@@ -48,6 +48,11 @@
         </div>
       </div>
 
+      <div class="card" id="requests-card" style="display:none;">
+        <h2 style="font-size:18px;margin-bottom:12px;">New booking requests</h2>
+        <div id="requests-list"></div>
+      </div>
+
       <div class="card" id="new-job-card" style="display:none;">
         <h2 style="font-size:18px;">New job</h2>
         <form id="new-job-form" class="inline-form">
@@ -121,12 +126,14 @@
   <script src="js/packages.js"></script>
   <script src="js/checklist.js"></script>
   <script src="js/jobs.js"></script>
+  <script src="js/bookingRequests.js"></script>
   <script>
     let customers = [];
     let vehicles = [];
     let packages = [];
     let techs = [];
     let todaysJobs = [];
+    let pendingRequests = [];
     let activeTechFilter = "";
     const vehiclesByCustomer = new Map();
     const customersById = new Map();
@@ -205,18 +212,20 @@
     async function loadEverything() {
       try {
         const { startIso, endIso } = todayRangeIso();
-        const [c, v, p, t, jobs] = await Promise.all([
+        const [c, v, p, t, jobs, requests] = await Promise.all([
           listCustomers(),
           listAllVehicles(),
           listPackages(),
           listTechs(),
           listJobsForRange(startIso, endIso),
+          listPendingBookingRequests(),
         ]);
         customers = c;
         vehicles = v;
         packages = p;
         techs = t;
         todaysJobs = jobs;
+        pendingRequests = requests;
 
         customersById.clear();
         customers.forEach((x) => customersById.set(x.id, x));
@@ -236,6 +245,7 @@
         renderTechFilters();
         renderStats();
         renderJobsList();
+        renderBookingRequests();
       } catch (err) {
         document.getElementById("jobs-list").innerHTML =
           `<p class="error-text">Could not load the dashboard: ${escapeHtml(err.message)}</p>`;
@@ -431,6 +441,167 @@
 
         try {
           await updateJob(j.id, fields);
+          await loadEverything();
+        } catch (err) {
+          errorEl.textContent = "Could not save: " + err.message;
+        }
+      });
+    }
+
+    // ---- Booking requests ----
+
+    function renderBookingRequests() {
+      const card = document.getElementById("requests-card");
+      const list = document.getElementById("requests-list");
+
+      if (pendingRequests.length === 0) {
+        card.style.display = "none";
+        return;
+      }
+
+      card.style.display = "";
+      list.innerHTML = pendingRequests.map((r) => renderRequestCard(r)).join("");
+      pendingRequests.forEach((r) => wireRequestCard(r));
+    }
+
+    function renderRequestCard(r) {
+      const pkg = r.package_id ? packagesById.get(r.package_id) : null;
+      const dayDate = new Date(`${r.requested_day}T00:00`);
+
+      return `
+        <div class="job-card" id="request-${r.id}">
+          <div class="view">
+            <div class="job-card-main">
+              <p><strong>${escapeHtml(r.customer_name)}</strong> &middot; ${escapeHtml(r.customer_phone)}</p>
+              <p>${escapeHtml(pkg ? pkg.name : "Unknown package")} &middot; ${escapeHtml(vehicleSizeLabel(r.vehicle_size))}</p>
+              <p>Requested: ${formatDateHeading(dayDate.toISOString())} &middot; ${r.requested_window === "morning" ? "Morning" : "Afternoon"}</p>
+              <p>${escapeHtml(r.address)}${r.area ? " &middot; " + escapeHtml(r.area) : ""}</p>
+              <p>Water/power confirmed: ${r.has_water_and_power ? "Yes" : "No"}</p>
+              ${r.notes ? `<p>Notes: ${escapeHtml(r.notes)}</p>` : ""}
+            </div>
+            <div class="row-actions" style="margin-top:10px;">
+              <button type="button" class="btn btn-primary" data-accept>Accept &amp; assign</button>
+              <button type="button" class="btn btn-secondary" data-suggest>Suggest time</button>
+              <button type="button" class="btn btn-secondary" data-decline>Decline</button>
+            </div>
+          </div>
+
+          <form class="inline-form accept-form" style="display:none;">
+            <div class="field">
+              <label>Date</label>
+              <input type="date" class="a-date" value="${r.requested_day}" required />
+            </div>
+            <div class="field">
+              <label>Time</label>
+              <input type="time" class="a-time" value="${r.requested_window === "morning" ? "09:00" : "13:00"}" required />
+            </div>
+            <div class="field">
+              <label>Assigned tech</label>
+              <select class="a-tech" required>
+                <option value="">Choose a tech...</option>
+                ${techs.map((t) => `<option value="${t.id}">${escapeHtml(t.name || "(no name)")}</option>`).join("")}
+              </select>
+            </div>
+            <div class="field">
+              <label>Length (minutes)</label>
+              <input type="number" min="0" class="a-minutes" value="${pkg ? pkg.estimated_minutes : 60}" />
+            </div>
+            <div class="field">
+              <label>Price ($)</label>
+              <input type="number" step="0.01" min="0" class="a-price" value="${pkg ? pkg["price_" + r.vehicle_size] : 0}" />
+            </div>
+            <p class="error-text accept-error"></p>
+            <div class="inline-form-actions">
+              <button type="submit" class="btn btn-primary">Create job</button>
+              <button type="button" class="btn btn-secondary" data-cancel-accept>Cancel</button>
+            </div>
+          </form>
+
+          <form class="inline-form suggest-form" style="display:none;">
+            <div class="field">
+              <label>Suggested date</label>
+              <input type="date" class="s-date" required />
+            </div>
+            <div class="field">
+              <label>Suggested window</label>
+              <select class="s-window">
+                <option value="morning">Morning</option>
+                <option value="afternoon">Afternoon</option>
+              </select>
+            </div>
+            <div class="field full">
+              <label>Note (for when you call/text them back)</label>
+              <input type="text" class="s-note" />
+            </div>
+            <p class="error-text suggest-error"></p>
+            <div class="inline-form-actions">
+              <button type="submit" class="btn btn-primary">Save suggestion</button>
+              <button type="button" class="btn btn-secondary" data-cancel-suggest>Cancel</button>
+            </div>
+          </form>
+        </div>
+      `;
+    }
+
+    function wireRequestCard(r) {
+      const card = document.getElementById(`request-${r.id}`);
+
+      card.querySelector("[data-accept]").addEventListener("click", () => {
+        card.querySelector(".view").style.display = "none";
+        card.querySelector(".accept-form").style.display = "grid";
+      });
+      card.querySelector("[data-cancel-accept]").addEventListener("click", () => {
+        card.querySelector(".view").style.display = "";
+        card.querySelector(".accept-form").style.display = "none";
+      });
+
+      card.querySelector("[data-suggest]").addEventListener("click", () => {
+        card.querySelector(".view").style.display = "none";
+        card.querySelector(".suggest-form").style.display = "grid";
+      });
+      card.querySelector("[data-cancel-suggest]").addEventListener("click", () => {
+        card.querySelector(".view").style.display = "";
+        card.querySelector(".suggest-form").style.display = "none";
+      });
+
+      card.querySelector("[data-decline]").addEventListener("click", async () => {
+        if (!window.confirm(`Decline the request from ${r.customer_name}?`)) return;
+        try {
+          await updateBookingRequest(r.id, { status: "declined" });
+          await loadEverything();
+        } catch (err) {
+          window.alert("Could not decline: " + err.message);
+        }
+      });
+
+      card.querySelector(".accept-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const errorEl = card.querySelector(".accept-error");
+        errorEl.textContent = "";
+        try {
+          await acceptBookingRequest(r, {
+            scheduledStart: localInputsToIso(card.querySelector(".a-date").value, card.querySelector(".a-time").value),
+            scheduledMinutes: parseInt(card.querySelector(".a-minutes").value, 10) || 60,
+            assignedTech: card.querySelector(".a-tech").value,
+            price: parseFloat(card.querySelector(".a-price").value) || 0,
+          });
+          await loadEverything();
+        } catch (err) {
+          errorEl.textContent = "Could not accept: " + err.message;
+        }
+      });
+
+      card.querySelector(".suggest-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const errorEl = card.querySelector(".suggest-error");
+        errorEl.textContent = "";
+        try {
+          await updateBookingRequest(r.id, {
+            status: "rescheduled",
+            suggested_day: card.querySelector(".s-date").value,
+            suggested_window: card.querySelector(".s-window").value,
+            owner_note: card.querySelector(".s-note").value.trim(),
+          });
           await loadEverything();
         } catch (err) {
           errorEl.textContent = "Could not save: " + err.message;

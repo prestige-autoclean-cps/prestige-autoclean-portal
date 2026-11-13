@@ -604,3 +604,130 @@ a:hover { color: var(--color-blue-dark); }
     font-size: 10px;
   }
 }
+
+/* ---- Public booking page (phase 5+) ---- */
+
+.booking-page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding-bottom: 60px;
+}
+
+.booking-hero {
+  background: var(--color-black);
+  color: #fff;
+  padding: 40px 20px 32px;
+  text-align: center;
+}
+
+.booking-hero img {
+  max-width: 160px;
+  margin-bottom: 16px;
+}
+
+.booking-hero h1 {
+  color: #fff;
+  font-size: 28px;
+}
+
+.booking-hero p {
+  color: var(--color-blue-light);
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.booking-body {
+  padding: 20px;
+}
+
+.step-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary);
+  margin: 28px 0 10px;
+}
+
+.step-label:first-child {
+  margin-top: 0;
+}
+
+.option-card {
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: #fff;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.option-card.selected {
+  border-color: var(--color-blue);
+  background: var(--color-bg);
+}
+
+.option-card h3 {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.option-card p {
+  margin: 2px 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.option-row {
+  display: flex;
+  gap: 10px;
+}
+
+.option-row .option-card {
+  flex: 1;
+  text-align: center;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.checkbox-row input {
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.summary-card {
+  background: var(--color-black);
+  color: #fff;
+  border-radius: var(--radius-card);
+  padding: 20px;
+  margin-top: 28px;
+}
+
+.summary-card p {
+  margin: 4px 0;
+  color: #fff;
+}
+
+.summary-card .summary-total {
+  font-family: var(--font-headline);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 28px;
+  margin-top: 8px;
+}
+
+.summary-card .btn-primary {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.summary-card .error-text {
+  color: var(--color-blue-light);
+}

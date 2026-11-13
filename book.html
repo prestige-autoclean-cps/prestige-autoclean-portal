@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Book a Detail — Prestige Auto Clean</title>
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:ital,wght@1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="booking-page">
+    <div class="booking-hero">
+      <img src="assets/logo.png" alt="Prestige Auto Clean" />
+      <h1>Book Your Detail</h1>
+      <p>We come to your home or office</p>
+    </div>
+
+    <div class="booking-body" id="form-section">
+      <p id="load-status" class="empty-text">Loading packages...</p>
+
+      <form id="booking-form" style="display:none;">
+        <div class="step-label">1. Choose a package</div>
+        <div id="package-options"></div>
+
+        <div class="step-label">2. Vehicle size</div>
+        <div class="option-row">
+          <div class="option-card" data-size="car">
+            <h3>Car</h3>
+          </div>
+          <div class="option-card" data-size="suv">
+            <h3>SUV</h3>
+          </div>
+          <div class="option-card" data-size="truck_van">
+            <h3>Truck / Van</h3>
+          </div>
+        </div>
+
+        <div class="step-label">3. Pick a day</div>
+        <div class="field">
+          <label for="bk-day">Day</label>
+          <input type="date" id="bk-day" required />
+        </div>
+        <div class="option-row">
+          <div class="option-card" data-window="morning">
+            <h3>Morning</h3>
+          </div>
+          <div class="option-card" data-window="afternoon">
+            <h3>Afternoon</h3>
+          </div>
+        </div>
+
+        <div class="step-label">4. Your info &amp; address</div>
+        <div class="field">
+          <label for="bk-name">Your name</label>
+          <input type="text" id="bk-name" required />
+        </div>
+        <div class="field">
+          <label for="bk-phone">Phone</label>
+          <input type="tel" id="bk-phone" required />
+        </div>
+        <div class="field">
+          <label for="bk-email">Email (optional)</label>
+          <input type="email" id="bk-email" />
+        </div>
+        <div class="field">
+          <label for="bk-address">Address</label>
+          <input type="text" id="bk-address" required />
+        </div>
+        <div class="field">
+          <label for="bk-area">City / ZIP</label>
+          <input type="text" id="bk-area" />
+        </div>
+        <div class="field">
+          <label for="bk-notes">Anything else we should know? (optional)</label>
+          <textarea id="bk-notes" style="min-height:70px;padding:10px 14px;border-radius:var(--radius-control);border:1px solid var(--color-border-strong);font-family:var(--font-body);font-size:16px;"></textarea>
+        </div>
+
+        <div class="checkbox-row">
+          <input type="checkbox" id="bk-water-power" required />
+          <label for="bk-water-power">I confirm an outdoor water spigot and an electrical outlet are available at this address.</label>
+        </div>
+
+        <div class="summary-card">
+          <p id="summary-package">Choose a package and vehicle size to see your price.</p>
+          <p id="summary-time"></p>
+          <div class="summary-total" id="summary-total"></div>
+          <p class="error-text" id="submit-error"></p>
+          <button type="submit" class="btn btn-primary" id="submit-btn">Request Appointment</button>
+          <p style="font-size:13px;color:var(--color-blue-light);margin-top:10px;">We'll text you to confirm the exact time.</p>
+        </div>
+      </form>
+
+      <div class="card" id="success-card" style="display:none; text-align:center;">
+        <h2 style="font-size:20px;">Request sent!</h2>
+        <p>Thanks — we'll text you shortly to confirm your appointment time.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/packages.js"></script>
+  <script src="js/bookingRequests.js"></script>
+  <script>
+    let activePackages = [];
+    let selectedPackageId = null;
+    let selectedSize = null;
+    let selectedWindow = null;
+
+    (async () => {
+      const dayInput = document.getElementById("bk-day");
+      dayInput.min = isoToDateInput(new Date().toISOString());
+
+      try {
+        const packages = await listPackages();
+        activePackages = packages.filter((p) => p.active);
+
+        if (activePackages.length === 0) {
+          document.getElementById("load-status").textContent =
+            "No packages are available to book right now — please call us.";
+          return;
+        }
+
+        document.getElementById("package-options").innerHTML = activePackages
+          .map(
+            (p) => `
+              <div class="option-card" data-package="${p.id}">
+                <h3>${escapeHtml(p.name)}</h3>
+                <p>${escapeHtml(p.description || "")}</p>
+                <p>Car ${formatMoney(p.price_car)} &middot; SUV ${formatMoney(p.price_suv)} &middot; Truck/Van ${formatMoney(p.price_truck_van)}</p>
+              </div>
+            `
+          )
+          .join("");
+
+        document.getElementById("package-options").querySelectorAll("[data-package]").forEach((el) => {
+          el.addEventListener("click", () => {
+            selectedPackageId = el.getAttribute("data-package");
+            document
+              .getElementById("package-options")
+              .querySelectorAll("[data-package]")
+              .forEach((other) => other.classList.toggle("selected", other === el));
+            updateSummary();
+          });
+        });
+
+        document.getElementById("load-status").style.display = "none";
+        document.getElementById("booking-form").style.display = "";
+      } catch (err) {
+        document.getElementById("load-status").textContent = "Could not load packages: " + err.message;
+      }
+    })();
+
+    document.querySelectorAll("[data-size]").forEach((el) => {
+      el.addEventListener("click", () => {
+        selectedSize = el.getAttribute("data-size");
+        document.querySelectorAll("[data-size]").forEach((other) => other.classList.toggle("selected", other === el));
+        updateSummary();
+      });
+    });
+
+    document.querySelectorAll("[data-window]").forEach((el) => {
+      el.addEventListener("click", () => {
+        selectedWindow = el.getAttribute("data-window");
+        document.querySelectorAll("[data-window]").forEach((other) => other.classList.toggle("selected", other === el));
+        updateSummary();
+      });
+    });
+
+    document.getElementById("bk-day").addEventListener("change", updateSummary);
+
+    function updateSummary() {
+      const pkg = activePackages.find((p) => p.id === selectedPackageId);
+      const summaryPackage = document.getElementById("summary-package");
+      const summaryTime = document.getElementById("summary-time");
+      const summaryTotal = document.getElementById("summary-total");
+
+      if (!pkg || !selectedSize) {
+        summaryPackage.textContent = "Choose a package and vehicle size to see your price.";
+        summaryTotal.textContent = "";
+      } else {
+        const price = pkg["price_" + selectedSize];
+        summaryPackage.textContent = `${pkg.name} · ${vehicleSizeLabel(selectedSize)}`;
+        summaryTotal.textContent = formatMoney(price);
+      }
+
+      const dayValue = document.getElementById("bk-day").value;
+      if (dayValue && selectedWindow) {
+        const dayDate = new Date(`${dayValue}T00:00`);
+        summaryTime.textContent = `${formatDateHeading(dayDate.toISOString())} · ${selectedWindow === "morning" ? "Morning" : "Afternoon"}`;
+      } else {
+        summaryTime.textContent = "";
+      }
+    }
+
+    document.getElementById("booking-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const errorEl = document.getElementById("submit-error");
+      errorEl.textContent = "";
+
+      if (!selectedPackageId) return (errorEl.textContent = "Please choose a package.");
+      if (!selectedSize) return (errorEl.textContent = "Please choose your vehicle size.");
+      if (!document.getElementById("bk-day").value) return (errorEl.textContent = "Please pick a day.");
+      if (!selectedWindow) return (errorEl.textContent = "Please choose morning or afternoon.");
+      if (!document.getElementById("bk-water-power").checked)
+        return (errorEl.textContent = "We need outdoor water and power to detail your vehicle.");
+
+      const submitBtn = document.getElementById("submit-btn");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Sending...";
+
+      try {
+        await submitBookingRequest({
+          customer_name: document.getElementById("bk-name").value.trim(),
+          customer_phone: document.getElementById("bk-phone").value.trim(),
+          customer_email: document.getElementById("bk-email").value.trim(),
+          vehicle_size: selectedSize,
+          package_id: selectedPackageId,
+          requested_day: document.getElementById("bk-day").value,
+          requested_window: selectedWindow,
+          address: document.getElementById("bk-address").value.trim(),
+          area: document.getElementById("bk-area").value.trim(),
+          has_water_and_power: true,
+          notes: document.getElementById("bk-notes").value.trim(),
+        });
+
+        document.getElementById("booking-form").style.display = "none";
+        document.getElementById("success-card").style.display = "";
+      } catch (err) {
+        errorEl.textContent = "Could not send your request: " + err.message;
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Request Appointment";
+      }
+    });
+  </script>
+</body>
+</html>
