@@ -750,17 +750,6 @@ a:hover { color: var(--color-blue-dark); }
   text-align: center;
 }
 
-.option-card-icon {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 8px;
-  color: var(--color-blue);
-}
-
-.option-card.selected .option-card-icon {
-  color: var(--color-blue-dark);
-}
-
 .summary-card {
   background: var(--color-black);
   color: #fff;
