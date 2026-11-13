@@ -55,7 +55,7 @@ customer.html          One customer: their info and their vehicles
 packages.html          The package menu (owner only — names, prices, length, checklist)
 job.html               One job: status, timer, checklist, before/after photos
 book.html              Public booking page — no login, anyone with the link can use it
-availability.html      Owner sets weekly business hours, used by the booking page
+availability.html      Owner's calendar — mark each day open (with hours) or closed
 team.html              Owner adds/removes tech logins and resets passwords
 assets/logo.png       Prestige Auto Clean logo
 css/variables.css     Colors, fonts, sizes — the brand "tokens"
@@ -70,7 +70,7 @@ js/jobs.js              Job database calls
 js/checklist.js         Checklist template + per-job checklist database calls
 js/jobPhotos.js         Before/after photo upload + database calls
 js/bookingRequests.js   Public booking submissions + owner accept/decline/suggest actions
-js/businessHours.js     Weekly hours + available-time-slot calculation
+js/availability.js      Per-date availability + available-time-slot calculation
 js/team.js              Staff list/edit + calls to the team-admin edge function
 supabase/functions/team-admin/index.ts           Server-side code for adding/removing techs
 supabase/001_profiles_and_auth.sql              Database setup script for Phase 1
@@ -79,6 +79,7 @@ supabase/003_jobs.sql                            Database setup script for Phase
 supabase/004_tech_job_screen.sql                 Database setup script for Phase 4
 supabase/005_booking_requests.sql                Database setup script for Phase 5
 supabase/006_availability_and_slots.sql          Database setup script for Phase 5's time-slot picker
+supabase/007_date_availability.sql               Switches availability from weekly to per-date
 ```
 
 ## Setup steps (already done — kept here for reference / a future handoff)
@@ -212,22 +213,28 @@ later (Phases 7–8), once Stripe and Twilio are connected.
    in it, paste it in, and click **Run**. This lets anyone see your active
    packages and their prices without logging in (needed for the booking
    page), and creates the table that holds booking requests.
-3. Do the same with `supabase/006_availability_and_slots.sql` — this adds
-   your weekly business hours (with sensible placeholder times to start)
-   and the logic that works out real bookable time slots, with at least a
-   1-hour gap before and after every other job.
-4. Log in as the **owner** and open **Availability** in the top bar. Set
-   your real hours for each day (or mark a day closed) and save — this is
-   what the booking page uses to offer times.
+3. Do the same with `supabase/006_availability_and_slots.sql`, then
+   `supabase/007_date_availability.sql` — together these add the logic
+   that works out real bookable time slots (with at least a 1-hour gap
+   before and after every other job), based on availability you set **per
+   specific date**, not a repeating weekly schedule (Prestige's days don't
+   follow a pattern — some wide open, some fully blocked, different every
+   week).
+4. Log in as the **owner** and open **Availability** in the top bar. It's a
+   calendar — click any day to mark it **Open** (with start/end times) or
+   **Closed**. A day you haven't touched yet shows "Not set" and won't
+   offer any times on the booking page until you set it, so get at least
+   the next week or two set up before sharing the booking link.
 5. The booking page lives at `book.html` on your live site — for example
    `https://your-site.vercel.app/book.html`. This is the link to share with
    customers (on your website, social media, a QR code on a card, etc.).
    Anyone with this link can submit a request; they never see or touch
    anything else in the portal.
 6. Try it yourself: open that link, pick a package and vehicle size, pick a
-   day, then pick one of the actual available time buttons (these already
-   account for your hours and leave an hour's gap around existing jobs),
-   fill in your info and address, check the water/power box, and submit.
+   day you marked open on the Availability calendar, then pick one of the
+   actual available time buttons (these already leave an hour's gap around
+   existing jobs), fill in your info and address, check the water/power
+   box, and submit.
 7. Back as the owner, the Dashboard shows a **New booking requests** card
    above "New job" when there's a pending request. Try:
    - **Accept & assign**: the date/time are pre-filled from the request;

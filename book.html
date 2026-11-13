@@ -100,11 +100,10 @@
   <script src="js/supabaseClient.js"></script>
   <script src="js/util.js"></script>
   <script src="js/packages.js"></script>
-  <script src="js/businessHours.js"></script>
+  <script src="js/availability.js"></script>
   <script src="js/bookingRequests.js"></script>
   <script>
     let activePackages = [];
-    let businessHoursByWeekday = new Map();
     let selectedPackageId = null;
     let selectedSize = null;
     let selectedSlotStart = null;
@@ -114,9 +113,8 @@
       dayInput.min = isoToDateInput(new Date().toISOString());
 
       try {
-        const [packages, hours] = await Promise.all([listPackages(), listBusinessHours()]);
+        const packages = await listPackages();
         activePackages = packages.filter((p) => p.active);
-        businessHoursByWeekday = new Map(hours.map((h) => [h.weekday, h]));
 
         if (activePackages.length === 0) {
           document.getElementById("load-status").textContent =
@@ -183,16 +181,15 @@
       container.innerHTML = `<p class="empty-text">Loading available times...</p>`;
 
       try {
-        const weekday = new Date(`${dayStr}T00:00`).getDay();
-        const hoursRow = businessHoursByWeekday.get(weekday);
+        const availabilityRow = await getDateAvailability(dayStr);
 
-        if (!hoursRow || !hoursRow.is_open) {
-          container.innerHTML = `<p class="empty-text">We're closed that day — please pick another.</p>`;
+        if (!availabilityRow || !availabilityRow.is_open) {
+          container.innerHTML = `<p class="empty-text">We're not available that day — please pick another.</p>`;
           return;
         }
 
         const busy = await getBusyIntervals(dayStr);
-        const slots = computeAvailableSlots(dayStr, hoursRow, busy, pkg.estimated_minutes, 60, 30);
+        const slots = computeAvailableSlots(dayStr, availabilityRow, busy, pkg.estimated_minutes, 60, 30);
 
         if (slots.length === 0) {
           container.innerHTML = `<p class="empty-text">No times available that day — please pick another.</p>`;

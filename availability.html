@@ -16,18 +16,62 @@
   <div class="page-shell">
     <h1 class="page-title">Availability</h1>
     <p class="empty-text" style="margin-bottom:16px;">
-      These are the hours customers can request on the public booking page
-      (book.html). Jobs you create yourself on the Dashboard or Schedule
-      aren't limited by these hours.
+      Click a day below to open it (with hours) or close it for booking.
+      A day with no color yet means it hasn't been set — it won't show any
+      bookable times on the public booking page until you set it.
     </p>
 
-    <div class="card">
-      <p id="status-text" class="empty-text">Loading...</p>
-      <form id="hours-form" style="display:none;">
-        <div id="hours-rows"></div>
-        <p class="error-text" id="hours-error"></p>
-        <button type="submit" class="btn btn-primary" id="hours-submit" style="margin-top:12px;">Save changes</button>
-      </form>
+    <p id="owner-only-text" class="card" style="display:none;">
+      Only the owner can manage availability.
+    </p>
+
+    <div class="card" id="calendar-card" style="display:none; margin-bottom:16px;">
+      <div class="calendar-nav">
+        <h2 id="calendar-month-label"></h2>
+        <div class="calendar-nav-buttons">
+          <button class="btn btn-secondary" id="calendar-prev-btn">&larr; Prev</button>
+          <button class="btn btn-secondary" id="calendar-today-btn">Today</button>
+          <button class="btn btn-secondary" id="calendar-next-btn">Next &rarr;</button>
+        </div>
+      </div>
+
+      <div class="calendar-weekdays">
+        <div class="calendar-weekday">Sun</div>
+        <div class="calendar-weekday">Mon</div>
+        <div class="calendar-weekday">Tue</div>
+        <div class="calendar-weekday">Wed</div>
+        <div class="calendar-weekday">Thu</div>
+        <div class="calendar-weekday">Fri</div>
+        <div class="calendar-weekday">Sat</div>
+      </div>
+
+      <div class="calendar-grid" id="calendar-grid"><p class="empty-text">Loading...</p></div>
+    </div>
+
+    <div class="card" id="day-panel" style="display:none;">
+      <h2 id="day-panel-heading" style="font-size:18px;margin-bottom:12px;">Day</h2>
+
+      <div class="toggle-row">
+        <button type="button" class="toggle-btn toggle-open" id="toggle-open-btn">Open</button>
+        <button type="button" class="toggle-btn toggle-closed" id="toggle-closed-btn">Closed</button>
+      </div>
+
+      <div id="hours-fields" style="display:none;">
+        <div class="field" style="display:inline-block;margin-right:16px;">
+          <label for="day-open-time">Opens</label>
+          <input type="time" id="day-open-time" value="08:00" />
+        </div>
+        <div class="field" style="display:inline-block;">
+          <label for="day-close-time">Closes</label>
+          <input type="time" id="day-close-time" value="18:00" />
+        </div>
+      </div>
+
+      <p class="error-text" id="day-error"></p>
+      <div class="inline-form-actions" style="margin-top:4px;">
+        <button type="button" class="btn btn-primary" id="day-save-btn">Save</button>
+        <button type="button" class="btn btn-secondary" id="day-clear-btn" style="display:none;">Clear (unset this day)</button>
+      </div>
     </div>
   </div>
 
@@ -36,9 +80,14 @@
   <script src="js/supabaseClient.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/util.js"></script>
-  <script src="js/businessHours.js"></script>
+  <script src="js/availability.js"></script>
   <script>
-    const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    let availabilityByDate = new Map();
+    const today = new Date();
+    const todayKey = isoToDateInput(today.toISOString());
+    let currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    let selectedDateKey = todayKey;
+    let selectedIsOpen = true;
 
     (async () => {
       const profile = await requireStaffSession();
@@ -48,70 +97,171 @@
       wireNavLogout();
 
       if (profile.role !== "owner") {
-        document.getElementById("status-text").textContent = "Only the owner can manage availability.";
+        document.getElementById("owner-only-text").style.display = "";
         return;
       }
 
-      await loadHours();
+      document.getElementById("calendar-card").style.display = "";
+      document.getElementById("day-panel").style.display = "";
+      await loadEverything();
     })();
 
-    async function loadHours() {
-      const statusText = document.getElementById("status-text");
-      try {
-        const hours = await listBusinessHours();
-        const rows = document.getElementById("hours-rows");
-        rows.innerHTML = hours
-          .map(
-            (h) => `
-              <div class="field" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-                <label style="width:100px;margin-bottom:0;">${WEEKDAY_NAMES[h.weekday]}</label>
-                <label style="display:flex;align-items:center;gap:6px;font-weight:400;width:auto;">
-                  <input type="checkbox" class="h-open" data-weekday="${h.weekday}" ${h.is_open ? "checked" : ""} style="width:20px;height:20px;" />
-                  Open
-                </label>
-                <input type="time" class="h-start" data-weekday="${h.weekday}" value="${h.open_time.slice(0, 5)}" />
-                <span>to</span>
-                <input type="time" class="h-end" data-weekday="${h.weekday}" value="${h.close_time.slice(0, 5)}" />
-              </div>
-            `
-          )
-          .join("");
+    function gridRange() {
+      const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+      const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+      const gridStart = new Date(monthStart);
+      gridStart.setDate(gridStart.getDate() - gridStart.getDay());
+      const gridEnd = new Date(monthEnd);
+      gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()) + 1); // exclusive
+      return { gridStart, gridEnd };
+    }
 
-        statusText.style.display = "none";
-        document.getElementById("hours-form").style.display = "";
+    async function loadEverything() {
+      const grid = document.getElementById("calendar-grid");
+      try {
+        const { gridStart, gridEnd } = gridRange();
+        const rows = await listDateAvailabilityRange(isoToDateInput(gridStart.toISOString()), isoToDateInput(gridEnd.toISOString()));
+        availabilityByDate = new Map(rows.map((r) => [r.date, r]));
+
+        renderCalendar();
+        renderDayPanel();
       } catch (err) {
-        statusText.textContent = "Could not load availability: " + err.message;
+        grid.innerHTML = `<p class="error-text">Could not load availability: ${escapeHtml(err.message)}</p>`;
       }
     }
 
-    document.getElementById("hours-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const errorEl = document.getElementById("hours-error");
+    function renderCalendar() {
+      document.getElementById("calendar-month-label").textContent = currentMonth.toLocaleDateString(undefined, {
+        month: "long",
+        year: "numeric",
+      });
+
+      const { gridStart, gridEnd } = gridRange();
+      const grid = document.getElementById("calendar-grid");
+      let html = "";
+      const cursor = new Date(gridStart);
+
+      while (cursor < gridEnd) {
+        const dateKey = isoToDateInput(cursor.toISOString());
+        const row = availabilityByDate.get(dateKey);
+        const isOtherMonth = cursor.getMonth() !== currentMonth.getMonth();
+        const classes = ["calendar-day"];
+        if (isOtherMonth) classes.push("other-month");
+        if (dateKey === todayKey) classes.push("is-today");
+        if (dateKey === selectedDateKey) classes.push("is-selected");
+
+        let statusHtml;
+        if (!row) {
+          statusHtml = `<span class="avail-status avail-status--unset">Not set</span>`;
+        } else if (row.is_open) {
+          statusHtml = `<span class="avail-status avail-status--open">${formatTime(`${dateKey}T${row.open_time}`)}&ndash;${formatTime(`${dateKey}T${row.close_time}`)}</span>`;
+        } else {
+          statusHtml = `<span class="avail-status avail-status--closed">Closed</span>`;
+        }
+
+        html += `
+          <button type="button" class="${classes.join(" ")}" data-date="${dateKey}">
+            <span class="calendar-day-number">${cursor.getDate()}</span>
+            ${statusHtml}
+          </button>
+        `;
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      grid.innerHTML = html;
+      grid.querySelectorAll("[data-date]").forEach((cell) => {
+        cell.addEventListener("click", () => {
+          selectedDateKey = cell.getAttribute("data-date");
+          renderCalendar();
+          renderDayPanel();
+        });
+      });
+    }
+
+    function renderDayPanel() {
+      const heading = document.getElementById("day-panel-heading");
+      const clearBtn = document.getElementById("day-clear-btn");
+      const errorEl = document.getElementById("day-error");
       errorEl.textContent = "";
-      const submitBtn = document.getElementById("hours-submit");
-      submitBtn.disabled = true;
+
+      const dayDate = new Date(`${selectedDateKey}T00:00`);
+      heading.textContent = formatDateHeading(dayDate.toISOString());
+
+      const row = availabilityByDate.get(selectedDateKey);
+      selectedIsOpen = row ? row.is_open : true;
+      setToggleUI(selectedIsOpen);
+
+      if (row && row.is_open) {
+        document.getElementById("day-open-time").value = row.open_time.slice(0, 5);
+        document.getElementById("day-close-time").value = row.close_time.slice(0, 5);
+      } else {
+        document.getElementById("day-open-time").value = "08:00";
+        document.getElementById("day-close-time").value = "18:00";
+      }
+
+      clearBtn.style.display = row ? "" : "none";
+    }
+
+    function setToggleUI(isOpen) {
+      selectedIsOpen = isOpen;
+      document.getElementById("toggle-open-btn").classList.toggle("selected", isOpen);
+      document.getElementById("toggle-closed-btn").classList.toggle("selected", !isOpen);
+      document.getElementById("hours-fields").style.display = isOpen ? "" : "none";
+    }
+
+    document.getElementById("toggle-open-btn").addEventListener("click", () => setToggleUI(true));
+    document.getElementById("toggle-closed-btn").addEventListener("click", () => setToggleUI(false));
+
+    document.getElementById("day-save-btn").addEventListener("click", async () => {
+      const errorEl = document.getElementById("day-error");
+      errorEl.textContent = "";
+
+      const fields = selectedIsOpen
+        ? {
+            is_open: true,
+            open_time: document.getElementById("day-open-time").value,
+            close_time: document.getElementById("day-close-time").value,
+          }
+        : { is_open: false, open_time: null, close_time: null };
+
+      if (selectedIsOpen && fields.open_time >= fields.close_time) {
+        errorEl.textContent = "Opening time must be before closing time.";
+        return;
+      }
 
       try {
-        const updates = [];
-        document.querySelectorAll(".h-open").forEach((checkbox) => {
-          const weekday = checkbox.getAttribute("data-weekday");
-          const openInput = document.querySelector(`.h-start[data-weekday="${weekday}"]`);
-          const closeInput = document.querySelector(`.h-end[data-weekday="${weekday}"]`);
-          updates.push(
-            updateBusinessHours(parseInt(weekday, 10), {
-              is_open: checkbox.checked,
-              open_time: openInput.value,
-              close_time: closeInput.value,
-            })
-          );
-        });
-        await Promise.all(updates);
-        await loadHours();
+        await setDateAvailability(selectedDateKey, fields);
+        await loadEverything();
       } catch (err) {
         errorEl.textContent = "Could not save: " + err.message;
-      } finally {
-        submitBtn.disabled = false;
       }
+    });
+
+    document.getElementById("day-clear-btn").addEventListener("click", async () => {
+      const errorEl = document.getElementById("day-error");
+      errorEl.textContent = "";
+      try {
+        await clearDateAvailability(selectedDateKey);
+        await loadEverything();
+      } catch (err) {
+        errorEl.textContent = "Could not clear: " + err.message;
+      }
+    });
+
+    document.getElementById("calendar-prev-btn").addEventListener("click", () => {
+      currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+      loadEverything();
+    });
+
+    document.getElementById("calendar-next-btn").addEventListener("click", () => {
+      currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1);
+      loadEverything();
+    });
+
+    document.getElementById("calendar-today-btn").addEventListener("click", () => {
+      currentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      selectedDateKey = todayKey;
+      loadEverything();
     });
   </script>
 </body>

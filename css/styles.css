@@ -754,3 +754,56 @@ a:hover { color: var(--color-blue-dark); }
   border-color: var(--color-blue);
   background: var(--color-bg);
 }
+
+/* ---- Availability calendar ---- */
+
+.avail-status {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 2px 5px;
+}
+
+.avail-status--open {
+  background: #e3f6ea;
+  color: var(--status-done);
+}
+
+.avail-status--closed {
+  background: #fde8e0;
+  color: var(--color-warning);
+}
+
+.avail-status--unset {
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+}
+
+.toggle-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.toggle-btn {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: var(--radius-control);
+  border: 2px solid var(--color-border-strong);
+  background: #fff;
+  color: var(--color-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toggle-btn.selected.toggle-open {
+  border-color: var(--status-done);
+  background: #e3f6ea;
+  color: var(--status-done);
+}
+
+.toggle-btn.selected.toggle-closed {
+  border-color: var(--color-warning);
+  background: #fde8e0;
+  color: var(--color-warning);
+}
