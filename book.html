@@ -22,23 +22,49 @@
       <p id="load-status" class="empty-text">Loading packages...</p>
 
       <form id="booking-form" style="display:none;">
-        <div class="step-label">1. Choose a package</div>
+        <div class="step-heading"><span class="step-number">1</span>Choose a package</div>
         <div id="package-options"></div>
 
-        <div class="step-label">2. Vehicle size</div>
+        <div class="step-heading"><span class="step-number">2</span>Vehicle size</div>
         <div class="option-row">
           <div class="option-card" data-size="car">
+            <div class="option-card-icon">
+              <svg width="32" height="20" viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 13.5 5.2 7a3 3 0 0 1 2.8-2h12a3 3 0 0 1 2.8 2l2.2 6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="1.5" y="13" width="29" height="4.5" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                <circle cx="8" cy="17.5" r="2" fill="currentColor"/>
+                <circle cx="24" cy="17.5" r="2" fill="currentColor"/>
+              </svg>
+            </div>
             <h3>Car</h3>
           </div>
           <div class="option-card" data-size="suv">
+            <div class="option-card-icon">
+              <svg width="32" height="20" viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 13 4 5.5a3 3 0 0 1 2.9-2.2h14.2a3 3 0 0 1 2.9 2.2L28 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <rect x="1" y="13" width="30" height="4.5" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M4 8.5h24" stroke="currentColor" stroke-width="1.6"/>
+                <circle cx="8" cy="17.5" r="2" fill="currentColor"/>
+                <circle cx="24" cy="17.5" r="2" fill="currentColor"/>
+              </svg>
+            </div>
             <h3>SUV</h3>
           </div>
           <div class="option-card" data-size="truck_van">
+            <div class="option-card-icon">
+              <svg width="32" height="20" viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1.5 6h15v7.5h-15z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <path d="M16.5 9h7l4 3v1.5h-11z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                <rect x="1.5" y="13" width="29" height="4.5" rx="2" stroke="currentColor" stroke-width="1.6"/>
+                <circle cx="8" cy="17.5" r="2" fill="currentColor"/>
+                <circle cx="24" cy="17.5" r="2" fill="currentColor"/>
+              </svg>
+            </div>
             <h3>Truck / Van</h3>
           </div>
         </div>
 
-        <div class="step-label">3. Pick a day and time</div>
+        <div class="step-heading"><span class="step-number">3</span>Pick a day and time</div>
         <div class="field">
           <label for="bk-day">Day</label>
           <input type="date" id="bk-day" required />
@@ -47,7 +73,7 @@
           <p class="empty-text">Choose a package and a day to see available times.</p>
         </div>
 
-        <div class="step-label">4. Your info &amp; address</div>
+        <div class="step-heading"><span class="step-number">4</span>Your info &amp; address</div>
         <div class="field">
           <label for="bk-name">Your name</label>
           <input type="text" id="bk-name" required />
@@ -139,7 +165,7 @@
               <div class="option-card" data-package="${p.id}">
                 <h3>${escapeHtml(p.name)}</h3>
                 <p>${escapeHtml(p.description || "")}</p>
-                <p>Car ${formatMoney(p.price_car)} &middot; SUV ${formatMoney(p.price_suv)} &middot; Truck/Van ${formatMoney(p.price_truck_van)}</p>
+                <p class="price-tag">Car ${formatMoney(p.price_car)} &middot; SUV ${formatMoney(p.price_suv)} &middot; Truck/Van ${formatMoney(p.price_truck_van)}</p>
               </div>
             `
           )
