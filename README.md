@@ -233,8 +233,9 @@ later (Phases 7–8), once Stripe and Twilio are connected.
 6. Try it yourself: open that link, pick a package and vehicle size, pick a
    day you marked open on the Availability calendar, then pick one of the
    actual available time buttons (these already leave an hour's gap around
-   existing jobs), fill in your info and address, check the water/power
-   box, and submit.
+   existing jobs), fill in your info and address, answer Yes/No on water
+   and power (not required to book — it's just so you know whether to
+   bring your own), and submit.
 7. Back as the owner, the Dashboard shows a **New booking requests** card
    above "New job" when there's a pending request. Try:
    - **Accept & assign**: the date/time are pre-filled from the request;

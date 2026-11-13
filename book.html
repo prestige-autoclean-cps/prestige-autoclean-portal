@@ -73,10 +73,20 @@
           <textarea id="bk-notes" style="min-height:70px;padding:10px 14px;border-radius:var(--radius-control);border:1px solid var(--color-border-strong);font-family:var(--font-body);font-size:16px;"></textarea>
         </div>
 
-        <div class="checkbox-row">
-          <input type="checkbox" id="bk-water-power" required />
-          <label for="bk-water-power">I confirm an outdoor water spigot and an electrical outlet are available at this address.</label>
+        <div class="field">
+          <label>Do you have an outdoor water spigot and an electrical outlet available?</label>
         </div>
+        <div class="option-row">
+          <div class="option-card" data-water-power="true">
+            <h3>Yes</h3>
+          </div>
+          <div class="option-card" data-water-power="false">
+            <h3>No</h3>
+          </div>
+        </div>
+        <p class="empty-text">
+          Not required to book — we'll just know to bring our own water/power if needed.
+        </p>
 
         <div class="summary-card">
           <p id="summary-package">Choose a package and vehicle size to see your price.</p>
@@ -107,6 +117,7 @@
     let selectedPackageId = null;
     let selectedSize = null;
     let selectedSlotStart = null;
+    let selectedWaterPower = null;
 
     (async () => {
       const dayInput = document.getElementById("bk-day");
@@ -159,6 +170,15 @@
         selectedSize = el.getAttribute("data-size");
         document.querySelectorAll("[data-size]").forEach((other) => other.classList.toggle("selected", other === el));
         updateSummary();
+      });
+    });
+
+    document.querySelectorAll("[data-water-power]").forEach((el) => {
+      el.addEventListener("click", () => {
+        selectedWaterPower = el.getAttribute("data-water-power") === "true";
+        document
+          .querySelectorAll("[data-water-power]")
+          .forEach((other) => other.classList.toggle("selected", other === el));
       });
     });
 
@@ -247,8 +267,6 @@
       if (!selectedSize) return (errorEl.textContent = "Please choose your vehicle size.");
       if (!document.getElementById("bk-day").value) return (errorEl.textContent = "Please pick a day.");
       if (!selectedSlotStart) return (errorEl.textContent = "Please choose a time.");
-      if (!document.getElementById("bk-water-power").checked)
-        return (errorEl.textContent = "We need outdoor water and power to detail your vehicle.");
 
       const submitBtn = document.getElementById("submit-btn");
       submitBtn.disabled = true;
@@ -266,7 +284,7 @@
           requested_time: isoToTimeInput(slot.toISOString()),
           address: document.getElementById("bk-address").value.trim(),
           area: document.getElementById("bk-area").value.trim(),
-          has_water_and_power: true,
+          has_water_and_power: selectedWaterPower === true,
           notes: document.getElementById("bk-notes").value.trim(),
         });
 
