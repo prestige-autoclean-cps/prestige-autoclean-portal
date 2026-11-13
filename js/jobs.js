@@ -64,11 +64,12 @@ async function deleteJob(id) {
   if (error) throw error;
 }
 
-async function listTechs() {
+// Everyone a job can be assigned to — every tech, plus the owner (so the
+// owner can assign jobs to themselves, not just techs).
+async function listAssignableStaff() {
   const { data, error } = await supabaseClient
     .from("profiles")
-    .select("id, name")
-    .eq("role", "tech")
+    .select("id, name, role")
     .order("name");
   if (error) throw error;
   return data;

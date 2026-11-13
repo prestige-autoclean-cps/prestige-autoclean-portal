@@ -75,9 +75,9 @@
             </select>
           </div>
           <div class="field">
-            <label for="nj-tech">Assigned tech</label>
+            <label for="nj-tech">Assigned to</label>
             <select id="nj-tech" required>
-              <option value="">Choose a tech...</option>
+              <option value="">Choose who...</option>
             </select>
           </div>
           <div class="field">
@@ -216,7 +216,7 @@
           listCustomers(),
           listAllVehicles(),
           listPackages(),
-          listTechs(),
+          listAssignableStaff(),
           listJobsForRange(startIso, endIso),
           listPendingBookingRequests(),
         ]);
@@ -268,7 +268,7 @@
 
       const techSelect = document.getElementById("nj-tech");
       techSelect.innerHTML =
-        `<option value="">Choose a tech...</option>` +
+        `<option value="">Choose who...</option>` +
         techs.map((t) => `<option value="${t.id}">${escapeHtml(t.name || "(no name set)")}</option>`).join("");
     }
 
@@ -334,7 +334,7 @@
                 <p class="job-time">${formatTime(j.scheduled_start)} &middot; ${j.scheduled_minutes} min</p>
                 <p>${escapeHtml(customer ? customer.name : "Unknown customer")} &middot; ${escapeHtml(vehicle ? vehicleLabel(vehicle) : "Unknown vehicle")}</p>
                 <p>${escapeHtml(pkg ? pkg.name : "No package")} &middot; ${escapeHtml(j.address || "No address")}</p>
-                <p>Tech: ${escapeHtml(tech ? tech.name || "(no name)" : "Unassigned")} &middot; ${formatMoney(j.price)}${Number(j.tip) > 0 ? " + " + formatMoney(j.tip) + " tip" : ""}</p>
+                <p>Assigned to: ${escapeHtml(tech ? tech.name || "(no name)" : "Unassigned")} &middot; ${formatMoney(j.price)}${Number(j.tip) > 0 ? " + " + formatMoney(j.tip) + " tip" : ""}</p>
               </div>
               <div>
                 <span class="status-pill status-pill--${j.status}">${escapeHtml(jobStatusLabel(j.status))}</span>
@@ -375,7 +375,7 @@
               <input type="number" step="0.01" min="0" class="e-tip" value="${j.tip}" />
             </div>
             <div class="field">
-              <label>Assigned tech</label>
+              <label>Assigned to</label>
               <select class="e-tech">
                 <option value="">Unassigned</option>
                 ${techs.map((t) => `<option value="${t.id}"${t.id === j.assigned_tech ? " selected" : ""}>${escapeHtml(t.name || "(no name)")}</option>`).join("")}
@@ -496,9 +496,9 @@
               <input type="time" class="a-time" value="${r.requested_time.slice(0, 5)}" required />
             </div>
             <div class="field">
-              <label>Assigned tech</label>
+              <label>Assigned to</label>
               <select class="a-tech" required>
-                <option value="">Choose a tech...</option>
+                <option value="">Choose who...</option>
                 ${techs.map((t) => `<option value="${t.id}">${escapeHtml(t.name || "(no name)")}</option>`).join("")}
               </select>
             </div>
