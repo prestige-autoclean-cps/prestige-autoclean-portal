@@ -474,7 +474,7 @@
             <div class="job-card-main">
               <p><strong>${escapeHtml(r.customer_name)}</strong> &middot; ${escapeHtml(r.customer_phone)}</p>
               <p>${escapeHtml(pkg ? pkg.name : "Unknown package")} &middot; ${escapeHtml(vehicleSizeLabel(r.vehicle_size))}</p>
-              <p>Requested: ${formatDateHeading(dayDate.toISOString())} &middot; ${r.requested_window === "morning" ? "Morning" : "Afternoon"}</p>
+              <p>Requested: ${formatDateHeading(dayDate.toISOString())} &middot; ${formatTime(`${r.requested_day}T${r.requested_time}`)}</p>
               <p>${escapeHtml(r.address)}${r.area ? " &middot; " + escapeHtml(r.area) : ""}</p>
               <p>Water/power confirmed: ${r.has_water_and_power ? "Yes" : "No"}</p>
               ${r.notes ? `<p>Notes: ${escapeHtml(r.notes)}</p>` : ""}
@@ -493,7 +493,7 @@
             </div>
             <div class="field">
               <label>Time</label>
-              <input type="time" class="a-time" value="${r.requested_window === "morning" ? "09:00" : "13:00"}" required />
+              <input type="time" class="a-time" value="${r.requested_time.slice(0, 5)}" required />
             </div>
             <div class="field">
               <label>Assigned tech</label>
@@ -523,11 +523,8 @@
               <input type="date" class="s-date" required />
             </div>
             <div class="field">
-              <label>Suggested window</label>
-              <select class="s-window">
-                <option value="morning">Morning</option>
-                <option value="afternoon">Afternoon</option>
-              </select>
+              <label>Suggested time</label>
+              <input type="time" class="s-time" required />
             </div>
             <div class="field full">
               <label>Note (for when you call/text them back)</label>
@@ -599,7 +596,7 @@
           await updateBookingRequest(r.id, {
             status: "rescheduled",
             suggested_day: card.querySelector(".s-date").value,
-            suggested_window: card.querySelector(".s-window").value,
+            suggested_time: card.querySelector(".s-time").value,
             owner_note: card.querySelector(".s-note").value.trim(),
           });
           await loadEverything();

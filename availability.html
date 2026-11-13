@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Availability — Prestige Auto Clean</title>
+  <link rel="icon" href="assets/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira:ital,wght@1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="nav-container"></div>
+
+  <div class="page-shell">
+    <h1 class="page-title">Availability</h1>
+    <p class="empty-text" style="margin-bottom:16px;">
+      These are the hours customers can request on the public booking page
+      (book.html). Jobs you create yourself on the Dashboard or Schedule
+      aren't limited by these hours.
+    </p>
+
+    <div class="card">
+      <p id="status-text" class="empty-text">Loading...</p>
+      <form id="hours-form" style="display:none;">
+        <div id="hours-rows"></div>
+        <p class="error-text" id="hours-error"></p>
+        <button type="submit" class="btn btn-primary" id="hours-submit" style="margin-top:12px;">Save changes</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/businessHours.js"></script>
+  <script>
+    const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    (async () => {
+      const profile = await requireStaffSession();
+      if (!profile) return;
+
+      document.getElementById("nav-container").innerHTML = renderNav(profile, "availability");
+      wireNavLogout();
+
+      if (profile.role !== "owner") {
+        document.getElementById("status-text").textContent = "Only the owner can manage availability.";
+        return;
+      }
+
+      await loadHours();
+    })();
+
+    async function loadHours() {
+      const statusText = document.getElementById("status-text");
+      try {
+        const hours = await listBusinessHours();
+        const rows = document.getElementById("hours-rows");
+        rows.innerHTML = hours
+          .map(
+            (h) => `
+              <div class="field" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                <label style="width:100px;margin-bottom:0;">${WEEKDAY_NAMES[h.weekday]}</label>
+                <label style="display:flex;align-items:center;gap:6px;font-weight:400;width:auto;">
+                  <input type="checkbox" class="h-open" data-weekday="${h.weekday}" ${h.is_open ? "checked" : ""} style="width:20px;height:20px;" />
+                  Open
+                </label>
+                <input type="time" class="h-start" data-weekday="${h.weekday}" value="${h.open_time.slice(0, 5)}" />
+                <span>to</span>
+                <input type="time" class="h-end" data-weekday="${h.weekday}" value="${h.close_time.slice(0, 5)}" />
+              </div>
+            `
+          )
+          .join("");
+
+        statusText.style.display = "none";
+        document.getElementById("hours-form").style.display = "";
+      } catch (err) {
+        statusText.textContent = "Could not load availability: " + err.message;
+      }
+    }
+
+    document.getElementById("hours-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const errorEl = document.getElementById("hours-error");
+      errorEl.textContent = "";
+      const submitBtn = document.getElementById("hours-submit");
+      submitBtn.disabled = true;
+
+      try {
+        const updates = [];
+        document.querySelectorAll(".h-open").forEach((checkbox) => {
+          const weekday = checkbox.getAttribute("data-weekday");
+          const openInput = document.querySelector(`.h-start[data-weekday="${weekday}"]`);
+          const closeInput = document.querySelector(`.h-end[data-weekday="${weekday}"]`);
+          updates.push(
+            updateBusinessHours(parseInt(weekday, 10), {
+              is_open: checkbox.checked,
+              open_time: openInput.value,
+              close_time: closeInput.value,
+            })
+          );
+        });
+        await Promise.all(updates);
+        await loadHours();
+      } catch (err) {
+        errorEl.textContent = "Could not save: " + err.message;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

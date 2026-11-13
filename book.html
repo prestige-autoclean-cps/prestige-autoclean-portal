@@ -38,18 +38,13 @@
           </div>
         </div>
 
-        <div class="step-label">3. Pick a day</div>
+        <div class="step-label">3. Pick a day and time</div>
         <div class="field">
           <label for="bk-day">Day</label>
           <input type="date" id="bk-day" required />
         </div>
-        <div class="option-row">
-          <div class="option-card" data-window="morning">
-            <h3>Morning</h3>
-          </div>
-          <div class="option-card" data-window="afternoon">
-            <h3>Afternoon</h3>
-          </div>
+        <div id="slot-options">
+          <p class="empty-text">Choose a package and a day to see available times.</p>
         </div>
 
         <div class="step-label">4. Your info &amp; address</div>
@@ -105,20 +100,23 @@
   <script src="js/supabaseClient.js"></script>
   <script src="js/util.js"></script>
   <script src="js/packages.js"></script>
+  <script src="js/businessHours.js"></script>
   <script src="js/bookingRequests.js"></script>
   <script>
     let activePackages = [];
+    let businessHoursByWeekday = new Map();
     let selectedPackageId = null;
     let selectedSize = null;
-    let selectedWindow = null;
+    let selectedSlotStart = null;
 
     (async () => {
       const dayInput = document.getElementById("bk-day");
       dayInput.min = isoToDateInput(new Date().toISOString());
 
       try {
-        const packages = await listPackages();
+        const [packages, hours] = await Promise.all([listPackages(), listBusinessHours()]);
         activePackages = packages.filter((p) => p.active);
+        businessHoursByWeekday = new Map(hours.map((h) => [h.weekday, h]));
 
         if (activePackages.length === 0) {
           document.getElementById("load-status").textContent =
@@ -145,6 +143,8 @@
               .getElementById("package-options")
               .querySelectorAll("[data-package]")
               .forEach((other) => other.classList.toggle("selected", other === el));
+            selectedSlotStart = null;
+            reloadSlots();
             updateSummary();
           });
         });
@@ -152,7 +152,7 @@
         document.getElementById("load-status").style.display = "none";
         document.getElementById("booking-form").style.display = "";
       } catch (err) {
-        document.getElementById("load-status").textContent = "Could not load packages: " + err.message;
+        document.getElementById("load-status").textContent = "Could not load the booking page: " + err.message;
       }
     })();
 
@@ -164,15 +164,59 @@
       });
     });
 
-    document.querySelectorAll("[data-window]").forEach((el) => {
-      el.addEventListener("click", () => {
-        selectedWindow = el.getAttribute("data-window");
-        document.querySelectorAll("[data-window]").forEach((other) => other.classList.toggle("selected", other === el));
-        updateSummary();
-      });
+    document.getElementById("bk-day").addEventListener("change", () => {
+      selectedSlotStart = null;
+      reloadSlots();
+      updateSummary();
     });
 
-    document.getElementById("bk-day").addEventListener("change", updateSummary);
+    async function reloadSlots() {
+      const container = document.getElementById("slot-options");
+      const dayStr = document.getElementById("bk-day").value;
+      const pkg = activePackages.find((p) => p.id === selectedPackageId);
+
+      if (!pkg || !dayStr) {
+        container.innerHTML = `<p class="empty-text">Choose a package and a day to see available times.</p>`;
+        return;
+      }
+
+      container.innerHTML = `<p class="empty-text">Loading available times...</p>`;
+
+      try {
+        const weekday = new Date(`${dayStr}T00:00`).getDay();
+        const hoursRow = businessHoursByWeekday.get(weekday);
+
+        if (!hoursRow || !hoursRow.is_open) {
+          container.innerHTML = `<p class="empty-text">We're closed that day — please pick another.</p>`;
+          return;
+        }
+
+        const busy = await getBusyIntervals(dayStr);
+        const slots = computeAvailableSlots(dayStr, hoursRow, busy, pkg.estimated_minutes, 60, 30);
+
+        if (slots.length === 0) {
+          container.innerHTML = `<p class="empty-text">No times available that day — please pick another.</p>`;
+          return;
+        }
+
+        container.innerHTML = `<div class="slot-grid">${slots
+          .map(
+            (s) =>
+              `<button type="button" class="slot-btn" data-slot="${s.toISOString()}">${s.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</button>`
+          )
+          .join("")}</div>`;
+
+        container.querySelectorAll("[data-slot]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            selectedSlotStart = btn.getAttribute("data-slot");
+            container.querySelectorAll("[data-slot]").forEach((other) => other.classList.toggle("selected", other === btn));
+            updateSummary();
+          });
+        });
+      } catch (err) {
+        container.innerHTML = `<p class="error-text">Could not load available times: ${escapeHtml(err.message)}</p>`;
+      }
+    }
 
     function updateSummary() {
       const pkg = activePackages.find((p) => p.id === selectedPackageId);
@@ -189,10 +233,9 @@
         summaryTotal.textContent = formatMoney(price);
       }
 
-      const dayValue = document.getElementById("bk-day").value;
-      if (dayValue && selectedWindow) {
-        const dayDate = new Date(`${dayValue}T00:00`);
-        summaryTime.textContent = `${formatDateHeading(dayDate.toISOString())} · ${selectedWindow === "morning" ? "Morning" : "Afternoon"}`;
+      if (selectedSlotStart) {
+        const slot = new Date(selectedSlotStart);
+        summaryTime.textContent = `${formatDateHeading(slot.toISOString())} · ${formatTime(slot.toISOString())}`;
       } else {
         summaryTime.textContent = "";
       }
@@ -206,7 +249,7 @@
       if (!selectedPackageId) return (errorEl.textContent = "Please choose a package.");
       if (!selectedSize) return (errorEl.textContent = "Please choose your vehicle size.");
       if (!document.getElementById("bk-day").value) return (errorEl.textContent = "Please pick a day.");
-      if (!selectedWindow) return (errorEl.textContent = "Please choose morning or afternoon.");
+      if (!selectedSlotStart) return (errorEl.textContent = "Please choose a time.");
       if (!document.getElementById("bk-water-power").checked)
         return (errorEl.textContent = "We need outdoor water and power to detail your vehicle.");
 
@@ -215,14 +258,15 @@
       submitBtn.textContent = "Sending...";
 
       try {
+        const slot = new Date(selectedSlotStart);
         await submitBookingRequest({
           customer_name: document.getElementById("bk-name").value.trim(),
           customer_phone: document.getElementById("bk-phone").value.trim(),
           customer_email: document.getElementById("bk-email").value.trim(),
           vehicle_size: selectedSize,
           package_id: selectedPackageId,
-          requested_day: document.getElementById("bk-day").value,
-          requested_window: selectedWindow,
+          requested_day: isoToDateInput(slot.toISOString()),
+          requested_time: isoToTimeInput(slot.toISOString()),
           address: document.getElementById("bk-address").value.trim(),
           area: document.getElementById("bk-area").value.trim(),
           has_water_and_power: true,

@@ -731,3 +731,26 @@ a:hover { color: var(--color-blue-dark); }
 .summary-card .error-text {
   color: var(--color-blue-light);
 }
+
+.slot-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.slot-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  border: 2px solid var(--color-border-strong);
+  background: #fff;
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.slot-btn.selected {
+  border-color: var(--color-blue);
+  background: var(--color-bg);
+}

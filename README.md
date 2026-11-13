@@ -52,6 +52,7 @@ customer.html          One customer: their info and their vehicles
 packages.html          The package menu (owner only — names, prices, length, checklist)
 job.html               One job: status, timer, checklist, before/after photos
 book.html              Public booking page — no login, anyone with the link can use it
+availability.html      Owner sets weekly business hours, used by the booking page
 assets/logo.png       Prestige Auto Clean logo
 css/variables.css     Colors, fonts, sizes — the brand "tokens"
 css/styles.css        Shared page styles
@@ -65,11 +66,13 @@ js/jobs.js              Job database calls
 js/checklist.js         Checklist template + per-job checklist database calls
 js/jobPhotos.js         Before/after photo upload + database calls
 js/bookingRequests.js   Public booking submissions + owner accept/decline/suggest actions
+js/businessHours.js     Weekly hours + available-time-slot calculation
 supabase/001_profiles_and_auth.sql              Database setup script for Phase 1
 supabase/002_customers_vehicles_packages.sql     Database setup script for Phase 2
 supabase/003_jobs.sql                            Database setup script for Phase 3
 supabase/004_tech_job_screen.sql                 Database setup script for Phase 4
 supabase/005_booking_requests.sql                Database setup script for Phase 5
+supabase/006_availability_and_slots.sql          Database setup script for Phase 5's time-slot picker
 ```
 
 ## Setup steps (already done — kept here for reference / a future handoff)
@@ -203,27 +206,35 @@ later (Phases 7–8), once Stripe and Twilio are connected.
    in it, paste it in, and click **Run**. This lets anyone see your active
    packages and their prices without logging in (needed for the booking
    page), and creates the table that holds booking requests.
-3. The booking page lives at `book.html` on your live site — for example
+3. Do the same with `supabase/006_availability_and_slots.sql` — this adds
+   your weekly business hours (with sensible placeholder times to start)
+   and the logic that works out real bookable time slots, with at least a
+   1-hour gap before and after every other job.
+4. Log in as the **owner** and open **Availability** in the top bar. Set
+   your real hours for each day (or mark a day closed) and save — this is
+   what the booking page uses to offer times.
+5. The booking page lives at `book.html` on your live site — for example
    `https://your-site.vercel.app/book.html`. This is the link to share with
    customers (on your website, social media, a QR code on a card, etc.).
    Anyone with this link can submit a request; they never see or touch
    anything else in the portal.
-4. Try it yourself: open that link, pick a package, vehicle size, a day and
-   morning/afternoon, fill in your info and address, check the water/power
-   box, and submit.
-5. Log in as the **owner** — the Dashboard now shows a **New booking
-   requests** card above "New job" when there's a pending request. Try:
-   - **Accept & assign**: pick the exact date/time, a tech, and confirm the
-     length/price (pre-filled from the package) — this creates a real job
-     and a customer record if one doesn't already exist for that phone
-     number (it always adds a new vehicle, since the booking page only asks
-     for size — add year/make/model on the Customers page afterward if you
-     want them on file).
+6. Try it yourself: open that link, pick a package and vehicle size, pick a
+   day, then pick one of the actual available time buttons (these already
+   account for your hours and leave an hour's gap around existing jobs),
+   fill in your info and address, check the water/power box, and submit.
+7. Back as the owner, the Dashboard shows a **New booking requests** card
+   above "New job" when there's a pending request. Try:
+   - **Accept & assign**: the date/time are pre-filled from the request;
+     pick a tech and confirm the length/price (also pre-filled) — this
+     creates a real job and a customer record if one doesn't already exist
+     for that phone number (it always adds a new vehicle, since the
+     booking page only asks for size — add year/make/model on the
+     Customers page afterward if you want them on file).
    - **Suggest time**: saves a different day/time and a note for you to
      call or text them about — it doesn't message them automatically yet
      (that's Phase 8).
    - **Decline**: removes it from the list.
-6. Only **pending** (brand-new) requests show on the dashboard. Accepted,
+8. Only **pending** (brand-new) requests show on the dashboard. Accepted,
    declined, or "suggested a time" requests disappear from that list for
    now — there's no history view for them yet.
 

@@ -12,7 +12,7 @@ async function listPendingBookingRequests() {
     .from("booking_requests")
     .select(
       "id, customer_name, customer_phone, customer_email, vehicle_size, package_id, " +
-        "requested_day, requested_window, address, area, has_water_and_power, notes, status, created_at"
+        "requested_day, requested_time, address, area, has_water_and_power, notes, status, created_at"
     )
     .eq("status", "new")
     .order("created_at");
